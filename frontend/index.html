@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mirror of Heart</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main class="chatgpt-style-container">
+        <header class="chatgpt-header">
+            <h1>Mirror of Heart</h1>
+        </header>
+        <section class="chatgpt-main">
+            <div class="chatgpt-column">
+                <div class="chatgpt-block" id="journal-section">
+                    <h2>Text Journal</h2>
+                    <textarea id="journal-input" placeholder="Write your thoughts..."></textarea>
+                    <button id="submit-journal">Submit Journal</button>
+                </div>
+                <div class="chatgpt-block" id="voice-section">
+                    <h2>Voice Journal</h2>
+                    <button id="start-recording">Start Recording</button>
+                    <button id="stop-recording" disabled>Stop Recording</button>
+                    <textarea id="voice-text" placeholder="Voice to text will appear here..."></textarea>
+                    <button id="submit-voice">Submit Voice Journal</button>
+                </div>
+                <div class="chatgpt-block" id="tasbih-section"></div>
+            </div>
+            <div class="chatgpt-column">
+                <div class="chatgpt-block" id="webcam-section">
+                    <h2>Webcam Emotion</h2>
+                    <video id="webcam" autoplay playsinline style="display:none;"></video>
+                    <button id="start-webcam">Start Webcam</button>
+                    <button id="capture-image" style="display:none;">Capture Image</button>
+                    <img id="captured-image" alt="Captured" style="display:none; margin-top:1rem;">
+                </div>
+                <div class="chatgpt-block" id="emotion-section">
+                    <h2>Detected Emotions</h2>
+                    <div id="emotion-display"></div>
+                </div>
+                <div class="chatgpt-block" id="search-section">
+                    <input id="search-bar" type="text" placeholder="Search journals by text, tag, or emotion..." aria-label="Search journals">
+                    <select id="language-select" aria-label="Select language">
+                        <option value="en">English</option>
+                        <option value="ur">Urdu</option>
+                        <option value="ar">Arabic</option>
+                    </select>
+                    <button id="export-csv">Export CSV</button>
+                    <button id="toggle-dark">Dark Mode</button>
+                </div>
+            </div>
+        </section>
+        <footer class="chatgpt-footer">
+            <small>© 2025 Mirror of Heart</small>
+        </footer>
+    </main>
+    <script src="app.js"></script>
+    <script src="face.js"></script>
+    <script src="voice.js"></script>
+    <script src="journal.js"></script>
+    <script src="tasbih.js"></script>
+</body>
+</html>
