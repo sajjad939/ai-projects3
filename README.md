@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> source/main
 # Mirror of Heart
 
 A modern web application for emotional journaling and digital tasbih (prayer beads), powered by AI emotion analysis and multi-language support.
@@ -78,3 +82,9 @@ MIT
 - **Tech Stack:** Node.js, Express, MongoDB, JavaScript, HTML/CSS, Gemini API, Hugging Face API
 - **Team:** [Your Name]
 - **Screenshots:** See README above.
+<<<<<<< HEAD
+=======
+=======
+# ai-projects
+>>>>>>> 135944435fe0ca07a36d365306f99269c88c2404
+>>>>>>> source/main
