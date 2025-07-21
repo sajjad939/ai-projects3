@@ -1104,3 +1104,868 @@ jobs:
 ```
 
 This comprehensive testing strategy ensures the Chatbot Service is reliable, performant, and maintainable. The tests cover all aspects from individual functions to complete user workflows, providing confidence in the system's quality and behavior.
+
+---
+
+# Mood Detection Service Testing Strategy
+
+## Overview
+
+This document outlines comprehensive testing strategies for the Mood Detection Service, including unit tests, integration tests, end-to-end tests, and performance testing approaches.
+
+## Testing Architecture
+
+```
+Testing Pyramid:
+├── Unit Tests (70%)
+│   ├── Service Logic
+│   ├── Controllers
+│   ├── Emotion Analysis
+│   └── Models
+├── Integration Tests (20%)
+│   ├── API Endpoints
+│   ├── Database Operations
+│   └── External Services
+└── End-to-End Tests (10%)
+    ├── User Workflows
+    ├── Frontend Integration
+    └── Performance Tests
+```
+
+## Unit Tests
+
+### 1. MoodDetectionService Tests
+
+#### `tests/unit/services/MoodDetectionService.test.js`
+
+```javascript
+const MoodDetectionService = require('../../../backend/services/MoodDetectionService');
+const MoodEntry = require('../../../backend/models/MoodEntry');
+const { analyzeTextEmotion } = require('../../../backend/utils/emotionAnalysis');
+
+// Mock dependencies
+jest.mock('../../../backend/models/MoodEntry');
+jest.mock('../../../backend/utils/emotionAnalysis');
+
+describe('MoodDetectionService', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        MoodDetectionService.analysisCache.clear();
+        MoodDetectionService.userPatternCache.clear();
+    });
+
+    describe('analyzeMood', () => {
+        it('should analyze text mood successfully', async () => {
+            // Arrange
+            const userId = '507f1f77bcf86cd799439011';
+            const input = {
+                type: 'text',
+                content: 'I am feeling very anxious and overwhelmed today',
+                context: { timeOfDay: 'evening' }
+            };
+            const options = { includeInsights: true, includeSuggestions: true };
+
+            analyzeTextEmotion.mockResolvedValue({
+                emotion: 'anxious',
+                confidence: 0.85,
+                scores: { anxious: 0.85, sad: 0.2, neutral: 0.1 }
+            });
+
+            MoodEntry.prototype.save = jest.fn().mockResolvedValue(true);
+
+            // Act
+            const result = await MoodDetectionService.analyzeMood(userId, input, options);
+
+            // Assert
+            expect(result).toHaveProperty('primaryEmotion', 'anxious');
+            expect(result).toHaveProperty('confidence', 0.85);
+            expect(result).toHaveProperty('intensity');
+            expect(result).toHaveProperty('insights');
+            expect(result).toHaveProperty('suggestions');
+            expect(result.analysisType).toBe('text');
+        });
+
+        it('should handle empty text input', async () => {
+            // Arrange
+            const userId = '507f1f77bcf86cd799439011';
+            const input = { type: 'text', content: '' };
+
+            // Act & Assert
+            await expect(MoodDetectionService.analyzeMood(userId, input))
+                .rejects.toThrow('Text content is required for text analysis');
+        });
+
+        it('should handle text that is too long', async () => {
+            // Arrange
+            const userId = '507f1f77bcf86cd799439011';
+            const input = { type: 'text', content: 'a'.repeat(5001) };
+
+            // Act & Assert
+            await expect(MoodDetectionService.analyzeMood(userId, input))
+                .rejects.toThrow('Text content too long');
+        });
+
+        it('should use cached results for similar analyses', async () => {
+            // Arrange
+            const userId = '507f1f77bcf86cd799439011';
+            const input = { type: 'text', content: 'I am happy today' };
+            
+            const cachedResult = {
+                primaryEmotion: 'joyful',
+                confidence: 0.9,
+                cacheUsed: true
+            };
+
+            const cacheKey = MoodDetectionService.generateCacheKey(userId, input);
+            MoodDetectionService.analysisCache.set(cacheKey, cachedResult);
+
+            // Act
+            const result = await MoodDetectionService.analyzeMood(userId, input);
+
+            // Assert
+            expect(result.primaryEmotion).toBe('joyful');
+            expect(analyzeTextEmotion).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('analyzeTextMood', () => {
+        it('should detect spiritual context', async () => {
+            // Arrange
+            const text = 'I am praying to Allah for guidance and peace';
+            const context = {};
+
+            analyzeTextEmotion.mockResolvedValue({
+                emotion: 'spiritual',
+                confidence: 0.8,
+                scores: { spiritual: 0.8, peaceful: 0.6 }
+            });
+
+            // Act
+            const result = await MoodDetectionService.analyzeTextMood(text, context);
+
+            // Assert
+            expect(result.spiritualContext.isSpiritual).toBe(true);
+            expect(result.spiritualContext.detectedTerms.spiritual).toContain('pray');
+            expect(result.spiritualContext.detectedTerms.religious).toContain('allah');
+        });
+
+        it('should handle mixed emotions', async () => {
+            // Arrange
+            const text = 'I am happy but also a bit worried about tomorrow';
+
+            analyzeTextEmotion.mockResolvedValue({
+                emotion: 'joyful',
+                confidence: 0.6,
+                scores: { joyful: 0.6, anxious: 0.4, neutral: 0.2 }
+            });
+
+            // Act
+            const result = await MoodDetectionService.analyzeTextMood(text);
+
+            // Assert
+            expect(result.primaryEmotion).toBe('joyful');
+            expect(result.emotions.anxious).toBe(0.4);
+            expect(result.intensity).toBe('medium');
+        });
+    });
+
+    describe('generateInsights', () => {
+        it('should generate confidence-based insights', async () => {
+            // Arrange
+            const analysis = {
+                primaryEmotion: 'joyful',
+                confidence: 0.9,
+                intensity: 'high'
+            };
+            const userId = '507f1f77bcf86cd799439011';
+
+            // Mock user patterns
+            jest.spyOn(MoodDetectionService, 'getUserEmotionPatterns')
+                .mockResolvedValue({
+                    dominantEmotions: ['joyful', 'peaceful'],
+                    recentTrend: 'improving'
+                });
+
+            // Act
+            const insights = await MoodDetectionService.generateInsights(analysis, userId);
+
+            // Assert
+            expect(insights).toHaveLength(2);
+            expect(insights[0].type).toBe('confidence');
+            expect(insights[1].type).toBe('trend');
+        });
+
+        it('should generate temporal insights for early morning', async () => {
+            // Arrange
+            const analysis = { primaryEmotion: 'anxious', confidence: 0.7 };
+            const userId = '507f1f77bcf86cd799439011';
+            
+            // Mock early morning time
+            jest.spyOn(Date.prototype, 'getHours').mockReturnValue(4);
+
+            // Act
+            const insights = await MoodDetectionService.generateInsights(analysis, userId);
+
+            // Assert
+            const temporalInsight = insights.find(i => i.type === 'temporal');
+            expect(temporalInsight).toBeDefined();
+            expect(temporalInsight.message).toContain('Early morning');
+        });
+    });
+
+    describe('generateSuggestions', () => {
+        it('should generate emotion-specific suggestions', async () => {
+            // Arrange
+            const analysis = { primaryEmotion: 'anxious', intensity: 'high' };
+            const userId = '507f1f77bcf86cd799439011';
+
+            // Act
+            const suggestions = await MoodDetectionService.generateSuggestions(analysis, userId);
+
+            // Assert
+            expect(suggestions.length).toBeGreaterThan(0);
+            const breathingSuggestion = suggestions.find(s => s.type === 'breathing');
+            expect(breathingSuggestion).toBeDefined();
+            expect(breathingSuggestion.title).toBe('Breathing Exercise');
+        });
+
+        it('should include spiritual suggestions for Muslim users', async () => {
+            // Arrange
+            const analysis = { primaryEmotion: 'spiritual', spiritualContext: { isSpiritual: true } };
+            const userId = '507f1f77bcf86cd799439011';
+
+            // Mock Muslim user
+            const User = require('../../../backend/models/User');
+            User.findById = jest.fn().mockResolvedValue({
+                spiritualPreferences: { religion: 'Islam' }
+            });
+
+            // Act
+            const suggestions = await MoodDetectionService.generateSuggestions(analysis, userId);
+
+            // Assert
+            const tasbihSuggestion = suggestions.find(s => s.type === 'tasbih');
+            expect(tasbihSuggestion).toBeDefined();
+        });
+    });
+});
+```
+
+### 2. Controller Tests
+
+#### `tests/unit/controllers/moodController.test.js`
+
+```javascript
+const request = require('supertest');
+const express = require('express');
+const moodController = require('../../../backend/controllers/moodController');
+const MoodDetectionService = require('../../../backend/services/MoodDetectionService');
+
+// Mock dependencies
+jest.mock('../../../backend/services/MoodDetectionService');
+
+const app = express();
+app.use(express.json());
+app.use((req, res, next) => {
+    req.userId = '507f1f77bcf86cd799439011';
+    next();
+});
+
+describe('MoodController', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    describe('POST /analyze', () => {
+        it('should analyze mood successfully', async () => {
+            // Arrange
+            const mockAnalysis = {
+                primaryEmotion: 'joyful',
+                confidence: 0.85,
+                intensity: 'high',
+                insights: [],
+                suggestions: []
+            };
+            MoodDetectionService.analyzeMood.mockResolvedValue(mockAnalysis);
+
+            // Act
+            const response = await request(app)
+                .post('/analyze')
+                .send({
+                    input: {
+                        type: 'text',
+                        content: 'I am so happy today!'
+                    },
+                    options: {
+                        includeInsights: true
+                    }
+                });
+
+            // Assert
+            expect(response.status).toBe(200);
+            expect(response.body.success).toBe(true);
+            expect(response.body.data.primaryEmotion).toBe('joyful');
+        });
+
+        it('should validate input type', async () => {
+            // Act
+            const response = await request(app)
+                .post('/analyze')
+                .send({
+                    input: {
+                        type: 'invalid',
+                        content: 'test'
+                    }
+                });
+
+            // Assert
+            expect(response.status).toBe(400);
+            expect(response.body.success).toBe(false);
+            expect(response.body.error).toContain('Invalid input type');
+        });
+
+        it('should validate content length', async () => {
+            // Act
+            const response = await request(app)
+                .post('/analyze')
+                .send({
+                    input: {
+                        type: 'text',
+                        content: 'a'.repeat(5001)
+                    }
+                });
+
+            // Assert
+            expect(response.status).toBe(400);
+            expect(response.body.error).toContain('too long');
+        });
+    });
+
+    describe('GET /history', () => {
+        it('should return mood history', async () => {
+            // Arrange
+            const mockHistory = {
+                entries: [
+                    {
+                        primaryEmotion: 'joyful',
+                        confidence: 0.8,
+                        createdAt: new Date()
+                    }
+                ],
+                pagination: { total: 1, limit: 20, offset: 0 }
+            };
+            MoodDetectionService.getMoodHistory.mockResolvedValue(mockHistory);
+
+            // Act
+            const response = await request(app).get('/history');
+
+            // Assert
+            expect(response.status).toBe(200);
+            expect(response.body.success).toBe(true);
+            expect(response.body.data.entries).toHaveLength(1);
+        });
+
+        it('should validate query parameters', async () => {
+            // Act
+            const response = await request(app)
+                .get('/history?limit=101');
+
+            // Assert
+            expect(response.status).toBe(400);
+            expect(response.body.error).toContain('Limit must be between 1 and 100');
+        });
+    });
+});
+
+// Add routes to test app
+app.post('/analyze', moodController.analyzeMood);
+app.get('/history', moodController.getMoodHistory);
+```
+
+### 3. Model Tests
+
+#### `tests/unit/models/MoodEntry.test.js`
+
+```javascript
+const mongoose = require('mongoose');
+const MoodEntry = require('../../../backend/models/MoodEntry');
+
+describe('MoodEntry Model', () => {
+    beforeAll(async () => {
+        await mongoose.connect(process.env.TEST_MONGO_URI);
+    });
+
+    afterAll(async () => {
+        await mongoose.connection.close();
+    });
+
+    beforeEach(async () => {
+        await MoodEntry.deleteMany({});
+    });
+
+    describe('Schema Validation', () => {
+        it('should create a valid mood entry', async () => {
+            // Arrange
+            const moodData = {
+                userId: new mongoose.Types.ObjectId(),
+                primaryEmotion: 'joyful',
+                confidence: 0.85,
+                intensity: 'high',
+                emotions: new Map([['joyful', 0.85], ['peaceful', 0.3]]),
+                analysisType: 'text'
+            };
+
+            // Act
+            const moodEntry = new MoodEntry(moodData);
+            const savedEntry = await moodEntry.save();
+
+            // Assert
+            expect(savedEntry._id).toBeDefined();
+            expect(savedEntry.primaryEmotion).toBe('joyful');
+            expect(savedEntry.confidence).toBe(0.85);
+        });
+
+        it('should require primary emotion', async () => {
+            // Arrange
+            const moodData = {
+                userId: new mongoose.Types.ObjectId(),
+                confidence: 0.85,
+                intensity: 'high',
+                analysisType: 'text'
+            };
+
+            // Act & Assert
+            const moodEntry = new MoodEntry(moodData);
+            await expect(moodEntry.save()).rejects.toThrow();
+        });
+
+        it('should validate emotion enum values', async () => {
+            // Arrange
+            const moodData = {
+                userId: new mongoose.Types.ObjectId(),
+                primaryEmotion: 'invalid_emotion',
+                confidence: 0.85,
+                intensity: 'high',
+                analysisType: 'text'
+            };
+
+            // Act & Assert
+            const moodEntry = new MoodEntry(moodData);
+            await expect(moodEntry.save()).rejects.toThrow();
+        });
+    });
+
+    describe('Virtual Properties', () => {
+        it('should calculate emotion category correctly', async () => {
+            // Arrange & Act
+            const positiveEntry = new MoodEntry({
+                userId: new mongoose.Types.ObjectId(),
+                primaryEmotion: 'joyful',
+                confidence: 0.8,
+                intensity: 'high',
+                analysisType: 'text'
+            });
+
+            const negativeEntry = new MoodEntry({
+                userId: new mongoose.Types.ObjectId(),
+                primaryEmotion: 'sad',
+                confidence: 0.7,
+                intensity: 'medium',
+                analysisType: 'text'
+            });
+
+            // Assert
+            expect(positiveEntry.emotionCategory).toBe('positive');
+            expect(negativeEntry.emotionCategory).toBe('negative');
+        });
+    });
+
+    describe('Static Methods', () => {
+        it('should get emotion distribution', async () => {
+            // Arrange
+            const userId = new mongoose.Types.ObjectId();
+            
+            await MoodEntry.create([
+                { userId, primaryEmotion: 'joyful', confidence: 0.8, intensity: 'high', analysisType: 'text' },
+                { userId, primaryEmotion: 'joyful', confidence: 0.7, intensity: 'medium', analysisType: 'text' },
+                { userId, primaryEmotion: 'peaceful', confidence: 0.9, intensity: 'high', analysisType: 'text' }
+            ]);
+
+            // Act
+            const distribution = await MoodEntry.getEmotionDistribution(userId, 30);
+
+            // Assert
+            expect(distribution).toHaveLength(2);
+            expect(distribution[0]._id).toBe('joyful');
+            expect(distribution[0].count).toBe(2);
+        });
+    });
+});
+```
+
+## Integration Tests
+
+### 1. API Integration Tests
+
+#### `tests/integration/mood.api.test.js`
+
+```javascript
+const request = require('supertest');
+const mongoose = require('mongoose');
+const app = require('../../backend/server');
+const User = require('../../backend/models/User');
+const MoodEntry = require('../../backend/models/MoodEntry');
+const jwt = require('jsonwebtoken');
+
+describe('Mood API Integration', () => {
+    let authToken;
+    let userId;
+
+    beforeAll(async () => {
+        await mongoose.connect(process.env.TEST_MONGO_URI);
+        
+        const user = new User({
+            username: 'testuser',
+            email: 'test@example.com',
+            password: 'password123',
+            spiritualPreferences: { religion: 'Islam' }
+        });
+        await user.save();
+        userId = user._id;
+
+        authToken = jwt.sign({ userId }, process.env.JWT_SECRET);
+    });
+
+    afterAll(async () => {
+        await User.deleteMany({});
+        await MoodEntry.deleteMany({});
+        await mongoose.connection.close();
+    });
+
+    beforeEach(async () => {
+        await MoodEntry.deleteMany({});
+    });
+
+    describe('POST /api/mood/analyze', () => {
+        it('should analyze text mood and save to database', async () => {
+            const response = await request(app)
+                .post('/api/mood/analyze')
+                .set('Authorization', `Bearer ${authToken}`)
+                .send({
+                    input: {
+                        type: 'text',
+                        content: 'I am feeling very grateful and blessed today, Alhamdulillah',
+                        context: { timeOfDay: 'morning' }
+                    },
+                    options: {
+                        includeInsights: true,
+                        includeSuggestions: true,
+                        saveToHistory: true
+                    }
+                });
+
+            expect(response.status).toBe(200);
+            expect(response.body.success).toBe(true);
+            expect(response.body.data.primaryEmotion).toBeDefined();
+            expect(response.body.data.spiritualContext.isSpiritual).toBe(true);
+
+            // Verify saved to database
+            const savedEntry = await MoodEntry.findOne({ userId });
+            expect(savedEntry).toBeTruthy();
+            expect(savedEntry.primaryEmotion).toBe(response.body.data.primaryEmotion);
+        });
+
+        it('should handle rate limiting', async () => {
+            // Send multiple requests quickly
+            const promises = Array(25).fill().map(() =>
+                request(app)
+                    .post('/api/mood/analyze')
+                    .set('Authorization', `Bearer ${authToken}`)
+                    .send({
+                        input: { type: 'text', content: 'Test message' }
+                    })
+            );
+
+            const responses = await Promise.all(promises);
+            const rateLimitedResponses = responses.filter(r => r.status === 429);
+            
+            expect(rateLimitedResponses.length).toBeGreaterThan(0);
+        });
+    });
+
+    describe('GET /api/mood/history', () => {
+        it('should return user mood history', async () => {
+            // Create test entries
+            await MoodEntry.create([
+                {
+                    userId,
+                    primaryEmotion: 'joyful',
+                    confidence: 0.8,
+                    intensity: 'high',
+                    analysisType: 'text'
+                },
+                {
+                    userId,
+                    primaryEmotion: 'peaceful',
+                    confidence: 0.9,
+                    intensity: 'medium',
+                    analysisType: 'text'
+                }
+            ]);
+
+            const response = await request(app)
+                .get('/api/mood/history')
+                .set('Authorization', `Bearer ${authToken}`);
+
+            expect(response.status).toBe(200);
+            expect(response.body.success).toBe(true);
+            expect(response.body.data.entries).toHaveLength(2);
+        });
+    });
+
+    describe('GET /api/mood/analytics', () => {
+        it('should generate mood analytics', async () => {
+            // Create test data
+            await MoodEntry.create([
+                { userId, primaryEmotion: 'joyful', confidence: 0.8, intensity: 'high', analysisType: 'text' },
+                { userId, primaryEmotion: 'joyful', confidence: 0.7, intensity: 'medium', analysisType: 'text' },
+                { userId, primaryEmotion: 'peaceful', confidence: 0.9, intensity: 'high', analysisType: 'text' }
+            ]);
+
+            const response = await request(app)
+                .get('/api/mood/analytics?timeframe=30d')
+                .set('Authorization', `Bearer ${authToken}`);
+
+            expect(response.status).toBe(200);
+            expect(response.body.success).toBe(true);
+            expect(response.body.data.totalEntries).toBe(3);
+            expect(response.body.data.dominantEmotion).toBe('joyful');
+        });
+    });
+});
+```
+
+## End-to-End Tests
+
+### 1. Frontend E2E Tests
+
+#### `tests/e2e/mood.e2e.test.js`
+
+```javascript
+const puppeteer = require('puppeteer');
+
+describe('Mood Detection E2E', () => {
+    let browser;
+    let page;
+
+    beforeAll(async () => {
+        browser = await puppeteer.launch({
+            headless: process.env.CI === 'true',
+            slowMo: 50
+        });
+        page = await browser.newPage();
+        
+        await page.setViewport({ width: 1200, height: 800 });
+        
+        // Mock authentication
+        await page.evaluateOnNewDocument(() => {
+            localStorage.setItem('token', 'mock-jwt-token');
+        });
+    });
+
+    afterAll(async () => {
+        await browser.close();
+    });
+
+    beforeEach(async () => {
+        await page.goto('http://localhost:3000');
+        await page.waitForSelector('#mood-detector');
+    });
+
+    it('should analyze text mood', async () => {
+        // Type in text input
+        await page.type('#mood-text-input', 'I am feeling very happy and grateful today!');
+        
+        // Click analyze button
+        await page.click('#analyze-text-btn');
+        
+        // Wait for results
+        await page.waitForSelector('#mood-results', { visible: true });
+        
+        // Verify results are displayed
+        const emotionName = await page.$eval('#emotion-name', el => el.textContent);
+        expect(emotionName).toBeTruthy();
+        
+        const confidence = await page.$eval('#emotion-confidence', el => el.textContent);
+        expect(confidence).toContain('%');
+    });
+
+    it('should switch between input tabs', async () => {
+        // Click voice tab
+        await page.click('[data-tab="voice"]');
+        await page.waitForSelector('#voice-tab.active');
+        
+        // Verify voice tab is active
+        const voiceTabActive = await page.$eval('#voice-tab', el => 
+            el.classList.contains('active')
+        );
+        expect(voiceTabActive).toBe(true);
+        
+        // Click image tab
+        await page.click('[data-tab="image"]');
+        await page.waitForSelector('#image-tab.active');
+        
+        // Verify image tab is active
+        const imageTabActive = await page.$eval('#image-tab', el => 
+            el.classList.contains('active')
+        );
+        expect(imageTabActive).toBe(true);
+    });
+
+    it('should display mood history', async () => {
+        // Click history button
+        await page.click('#mood-history-btn');
+        await page.waitForSelector('.mood-history-panel.visible');
+        
+        // Verify history panel is visible
+        const historyVisible = await page.$eval('.mood-history-panel', el => 
+            el.classList.contains('visible')
+        );
+        expect(historyVisible).toBe(true);
+        
+        // Close history panel
+        await page.click('#close-history-btn');
+        await page.waitForFunction(() => 
+            !document.querySelector('.mood-history-panel').classList.contains('visible')
+        );
+    });
+
+    it('should handle suggestion actions', async () => {
+        // Analyze mood first
+        await page.type('#mood-text-input', 'I am feeling anxious and worried');
+        await page.click('#analyze-text-btn');
+        await page.waitForSelector('#mood-results', { visible: true });
+        
+        // Click on a suggestion
+        const suggestionBtn = await page.$('.suggestion-action');
+        if (suggestionBtn) {
+            await suggestionBtn.click();
+            // Verify action was handled (implementation specific)
+        }
+    });
+});
+```
+
+## Performance Tests
+
+### 1. Load Testing
+
+#### `tests/performance/mood.load.test.js`
+
+```javascript
+const autocannon = require('autocannon');
+const jwt = require('jsonwebtoken');
+
+describe('Mood Detection Performance', () => {
+    const authToken = jwt.sign({ userId: '507f1f77bcf86cd799439011' }, process.env.JWT_SECRET);
+
+    it('should handle concurrent mood analysis requests', async () => {
+        const result = await autocannon({
+            url: 'http://localhost:5000/api/mood/analyze',
+            connections: 10,
+            duration: 30,
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                input: {
+                    type: 'text',
+                    content: 'Performance test message for mood analysis'
+                },
+                options: {
+                    includeInsights: true,
+                    includeSuggestions: true
+                }
+            }),
+            method: 'POST'
+        });
+
+        expect(result.errors).toBe(0);
+        expect(result.timeouts).toBe(0);
+        expect(result.non2xx).toBeLessThan(result.requests.total * 0.01);
+        expect(result.latency.average).toBeLessThan(3000); // Under 3s average
+    });
+
+    it('should handle mood history requests efficiently', async () => {
+        const result = await autocannon({
+            url: 'http://localhost:5000/api/mood/history',
+            connections: 20,
+            duration: 15,
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        expect(result.errors).toBe(0);
+        expect(result.latency.average).toBeLessThan(1000); // Under 1s average
+    });
+});
+```
+
+## Test Configuration
+
+### 1. Jest Configuration Update
+
+#### `jest.config.js`
+
+```javascript
+module.exports = {
+    testEnvironment: 'node',
+    setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
+    testMatch: [
+        '<rootDir>/tests/**/*.test.js'
+    ],
+    collectCoverageFrom: [
+        'backend/**/*.js',
+        '!backend/node_modules/**',
+        '!backend/coverage/**'
+    ],
+    coverageThreshold: {
+        global: {
+            branches: 80,
+            functions: 80,
+            lines: 80,
+            statements: 80
+        },
+        './backend/services/MoodDetectionService.js': {
+            branches: 85,
+            functions: 85,
+            lines: 85,
+            statements: 85
+        }
+    },
+    testTimeout: 30000,
+    maxWorkers: 4
+};
+```
+
+### 2. Package.json Scripts Update
+
+```json
+{
+  "scripts": {
+    "test": "jest",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration",
+    "test:e2e": "jest tests/e2e",
+    "test:performance": "jest tests/performance",
+    "test:mood": "jest tests/**/*mood*.test.js",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --watchAll=false"
+  }
+}
+```
+
+This comprehensive testing strategy ensures the Mood Detection Service is reliable, accurate, and performant. The tests cover emotion analysis accuracy, API functionality, user interface interactions, and system performance under load.
