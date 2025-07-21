@@ -1,0 +1,221 @@
+body {
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f7f8fa;
+    color: #222;
+    transition: background 0.3s, color 0.3s;
+}
+body.dark-mode {
+    background: #181a1b;
+    color: #f7f8fa;
+}
+.container {
+    max-width: 700px;
+    margin: 2rem auto;
+    padding: 1rem;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+h1 {
+    text-align: center;
+    color: #2a7ae2;
+}
+section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 1rem;
+    resize: vertical;
+}
+button {
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 8px;
+    background: #2a7ae2;
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+button:disabled {
+    background: #aaa;
+    cursor: not-allowed;
+}
+button:hover:not(:disabled) {
+    background: #1a5bb8;
+}
+#emotion-display {
+    min-height: 40px;
+    padding: 0.5rem;
+    background: #eaf4ff;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    color: #2a7ae2;
+}
+input[type="text"], select {
+    padding: 0.5rem;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+}
+#search-section {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+.journal-entry {
+    position: relative;
+    background: #f3f6fa;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    padding: 0.75rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+body.dark-mode .journal-entry {
+    background: #23272b;
+    color: #f7f8fa;
+}
+.journal-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
+}
+.favorite {
+    color: #e2a72a;
+    font-weight: bold;
+}
+button[aria-label] {
+    outline: 2px solid #2a7ae2;
+}
+
+/* Multi-language support styles */
+#language-select {
+    min-width: 120px;
+    background: #fff;
+    color: #222;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 1rem;
+}
+body.dark-mode #language-select {
+    background: #23272b;
+    color: #f7f8fa;
+    border: 1px solid #444;
+}
+
+/* Notification styles */
+#reminder-notification {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    background: #2a7ae2;
+    color: #fff;
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    font-size: 1rem;
+    z-index: 1000;
+    display: none;
+}
+
+/* Accessibility: focus styles */
+.journal-entry:focus {
+    outline: 2px solid #e2a72a;
+    background: #eaf4ff;
+}
+body.dark-mode .journal-entry:focus {
+    background: #23272b;
+    outline: 2px solid #e2a72a;
+}
+
+/* ChatGPT-style layout */
+.chatgpt-style-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background: #f7f8fa;
+}
+.chatgpt-header {
+    background: #2a7ae2;
+    color: #fff;
+    padding: 1.5rem 0;
+    text-align: center;
+    font-size: 2rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+}
+.chatgpt-main {
+    flex: 1;
+    display: flex;
+    gap: 2rem;
+    padding: 2rem;
+    justify-content: center;
+}
+.chatgpt-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+.chatgpt-block {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.chatgpt-footer {
+    background: #2a7ae2;
+    color: #fff;
+    text-align: center;
+    padding: 1rem 0;
+    font-size: 1rem;
+}
+@media (max-width: 900px) {
+    .chatgpt-main {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1rem;
+    }
+    .chatgpt-column {
+        gap: 1rem;
+    }
+}
+@media (max-width: 600px) {
+    .chatgpt-style-container {
+        min-height: 100vh;
+    }
+    .chatgpt-header {
+        font-size: 1.3rem;
+        padding: 1rem 0;
+    }
+    .chatgpt-main {
+        padding: 0.5rem;
+    }
+    .chatgpt-block {
+        padding: 1rem;
+    }
+    button, textarea, input[type="text"], select {
+        font-size: 0.95rem;
+    }
+}
