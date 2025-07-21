@@ -21,6 +21,7 @@ const userRoutes = require('./routes/userRoutes');
 const ApiLog = require('./models/ApiLog');
 const adminRoutes = require('./routes/adminRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
+const moodRoutes = require('./routes/moodRoutes');
 >>>>>>> source/main
 
 const app = express();
@@ -53,6 +54,7 @@ app.post('/api/gemini', async (req, res) => {
 app.use('/user', authMiddleware, userRoutes);
 app.use('/admin', authMiddleware, adminRoutes);
 app.use('/chatbot', chatbotRoutes);
+app.use('/mood', moodRoutes);
 
 // Gemini API route (per-user key support + logging)
 app.post('/api/gemini', async (req, res) => {
