@@ -5,6 +5,12 @@ const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
+<<<<<<< HEAD
+=======
+    geminiApiKey: { type: String }, // Optional: store user's Gemini API key
+    isAdmin: { type: Boolean, default: false }, // Admin flag
+    suspended: { type: Boolean, default: false }, // Suspended flag
+>>>>>>> source/main
     createdAt: { type: Date, default: Date.now }
 });
 

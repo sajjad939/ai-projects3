@@ -14,6 +14,14 @@ const tasbihRoutes = require('./routes/tasbihRoutes');
 const authMiddleware = require('./middleware/authMiddleware');
 const authController = require('./controllers/authController');
 const errorHandler = require('./middleware/errorHandler');
+<<<<<<< HEAD
+=======
+const User = require('./models/User');
+const userRoutes = require('./routes/userRoutes');
+const ApiLog = require('./models/ApiLog');
+const adminRoutes = require('./routes/adminRoutes');
+const chatbotRoutes = require('./routes/chatbotRoutes');
+>>>>>>> source/main
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -34,23 +42,66 @@ app.post('/login', authController.login);
 app.use('/journal', authMiddleware, journalRoutes);
 app.use('/emotion', authMiddleware, emotionRoutes);
 app.use('/tasbih', authMiddleware, tasbihRoutes);
+<<<<<<< HEAD
 
 // Gemini API route
 app.post('/api/gemini', async (req, res) => {
     try {
         const { prompt } = req.body;
         if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
+=======
+app.use('/user', authMiddleware, userRoutes);
+app.use('/admin', authMiddleware, adminRoutes);
+app.use('/chatbot', chatbotRoutes);
+
+// Gemini API route (per-user key support + logging)
+app.post('/api/gemini', async (req, res) => {
+    const { prompt, userId } = req.body;
+    let status = 200;
+    let logDetails = {};
+    try {
+        if (!prompt) {
+            status = 400;
+            throw new Error('Prompt is required');
+        }
+        let apiKey = process.env.GEMINI_API_KEY;
+        if (userId) {
+            const user = await User.findById(userId);
+            if (user && user.geminiApiKey) apiKey = user.geminiApiKey;
+        }
+>>>>>>> source/main
         const response = await axios.post('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
             contents: [{ parts: [{ text: prompt }] }]
         }, {
             headers: {
                 'Content-Type': 'application/json',
+<<<<<<< HEAD
                 'x-goog-api-key': geminiApiKey
             }
         });
         res.json({ result: response.data });
     } catch (err) {
         res.status(500).json({ error: 'Gemini API request failed', details: err.message });
+=======
+                'x-goog-api-key': apiKey
+            }
+        });
+        logDetails = { result: response.data };
+        res.json({ result: response.data });
+    } catch (err) {
+        status = status === 200 ? 500 : status;
+        logDetails = { error: err.message };
+        res.status(status).json({ error: 'Gemini API request failed', details: err.message });
+    } finally {
+        // Log the API usage
+        await ApiLog.create({
+            userId: userId || null,
+            endpoint: '/api/gemini',
+            method: 'POST',
+            status,
+            details: logDetails
+        });
+>>>>>>> source/main
     }
 });
 
