@@ -1,112 +1,151 @@
 const axios = require('axios');
-const tf = require('@tensorflow/tfjs-node');
-const natural = require('natural');
-const { analyzeTextEmotion } = require('../utils/emotionAnalysis');
-const ApiLog = require('../models/ApiLog');
 const MoodEntry = require('../models/MoodEntry');
 const User = require('../models/User');
+const { analyzeTextEmotion } = require('../utils/emotionAnalysis');
+const natural = require('natural');
 
 /**
- * Advanced Mood Detection Service for Mirror of Heart
- * Provides comprehensive emotion analysis from text, voice, and image inputs
- * with spiritual context awareness and personalized insights
+ * Comprehensive Mood Detection Service for Mirror of Heart
+ * Provides advanced emotion analysis with spiritual context awareness
  */
 class MoodDetectionService {
     constructor() {
+        // Enhanced emotion categories with spiritual context
         this.emotionCategories = {
-            // Primary emotions with spiritual context
             peaceful: {
-                keywords: ['calm', 'serene', 'tranquil', 'peaceful', 'centered', 'balanced', 'still', 'quiet'],
+                keywords: ['calm', 'serene', 'tranquil', 'peaceful', 'relaxed', 'centered', 'balanced', 'still'],
                 spiritualContext: 'inner peace',
-                guidance: 'Continue nurturing this beautiful state of peace through meditation and prayer.',
+                guidance: 'Continue nurturing this beautiful state of peace through mindfulness and gratitude',
                 color: '#4ade80',
-                intensity: 'positive'
+                intensity: 'positive',
+                practices: ['meditation', 'dhikr', 'contemplation']
             },
             grateful: {
                 keywords: ['thankful', 'blessed', 'grateful', 'appreciative', 'fortunate', 'abundance'],
-                spiritualContext: 'gratitude practice',
-                guidance: 'Your gratitude opens your heart to divine blessings. Consider keeping a gratitude journal.',
+                spiritualContext: 'gratitude and blessings',
+                guidance: 'Your gratitude opens doors to more blessings. Share this joy with others',
                 color: '#f59e0b',
-                intensity: 'positive'
+                intensity: 'positive',
+                practices: ['gratitude prayer', 'thanksgiving', 'charity']
             },
             anxious: {
                 keywords: ['worried', 'anxious', 'nervous', 'stressed', 'overwhelmed', 'panic', 'fear', 'uncertain'],
-                spiritualContext: 'seeking comfort',
-                guidance: 'In times of anxiety, remember that you are held by divine love. Try breathing prayers.',
+                spiritualContext: 'seeking divine comfort',
+                guidance: 'In times of anxiety, remember that you are held by divine love and protection',
                 color: '#ef4444',
-                intensity: 'negative'
+                intensity: 'negative',
+                practices: ['breathing exercises', 'prayer', 'seeking refuge']
             },
             sad: {
                 keywords: ['sad', 'depressed', 'down', 'upset', 'hurt', 'pain', 'sorrow', 'grief', 'lonely'],
-                spiritualContext: 'need for comfort',
-                guidance: 'Your sadness is seen and held with compassion. Consider reaching out for spiritual support.',
+                spiritualContext: 'healing and comfort',
+                guidance: 'Your pain is seen and acknowledged. Healing comes through patience and faith',
                 color: '#3b82f6',
-                intensity: 'negative'
+                intensity: 'negative',
+                practices: ['prayer for healing', 'community support', 'remembrance']
             },
             joyful: {
                 keywords: ['happy', 'joy', 'excited', 'wonderful', 'amazing', 'great', 'fantastic', 'delighted'],
-                spiritualContext: 'celebration',
-                guidance: 'Your joy is a gift! Share this light with others and give thanks for this blessing.',
+                spiritualContext: 'divine joy',
+                guidance: 'Your joy is a gift from the divine. Let it illuminate your path and inspire others',
                 color: '#10b981',
-                intensity: 'positive'
+                intensity: 'positive',
+                practices: ['celebration', 'sharing joy', 'praise']
             },
             spiritual: {
-                keywords: ['pray', 'prayer', 'god', 'allah', 'divine', 'blessed', 'faith', 'meditation', 'worship', 'sacred'],
-                spiritualContext: 'spiritual connection',
-                guidance: 'Your spiritual awareness is growing. Continue deepening your connection through practice.',
+                keywords: ['pray', 'prayer', 'god', 'allah', 'divine', 'blessed', 'faith', 'spiritual', 'meditation', 'worship'],
+                spiritualContext: 'divine connection',
+                guidance: 'Your spiritual awareness is growing. Continue to nurture this sacred connection',
                 color: '#8b5cf6',
-                intensity: 'positive'
+                intensity: 'transcendent',
+                practices: ['prayer', 'meditation', 'study', 'worship']
             },
             angry: {
                 keywords: ['angry', 'mad', 'furious', 'frustrated', 'irritated', 'annoyed', 'rage', 'hate'],
-                spiritualContext: 'need for forgiveness',
-                guidance: 'Anger can teach us about our values. Consider what this emotion is protecting in you.',
+                spiritualContext: 'seeking patience',
+                guidance: 'Channel this energy toward positive change. Seek patience and understanding',
                 color: '#dc2626',
-                intensity: 'negative'
+                intensity: 'negative',
+                practices: ['patience prayer', 'forgiveness', 'cooling down']
             },
             hopeful: {
-                keywords: ['hope', 'optimistic', 'confident', 'positive', 'faith', 'trust', 'believe'],
-                spiritualContext: 'faith and trust',
-                guidance: 'Your hope is a beacon of light. Trust in the divine plan unfolding in your life.',
+                keywords: ['hopeful', 'optimistic', 'confident', 'positive', 'encouraged', 'inspired'],
+                spiritualContext: 'divine hope',
+                guidance: 'Hope is a light in darkness. Trust in the divine plan unfolding',
                 color: '#06b6d4',
-                intensity: 'positive'
-            }
-        };
-
-        // Advanced emotion patterns for better detection
-        this.emotionPatterns = {
-            intensity_modifiers: {
-                high: ['extremely', 'incredibly', 'overwhelmingly', 'deeply', 'profoundly'],
-                medium: ['quite', 'fairly', 'somewhat', 'rather', 'pretty'],
-                low: ['slightly', 'a bit', 'a little', 'mildly', 'barely']
+                intensity: 'positive',
+                practices: ['hope prayers', 'positive affirmations', 'trust building']
             },
-            negation_words: ['not', 'never', 'no', 'none', 'nothing', 'neither', 'nor'],
-            temporal_indicators: {
-                past: ['was', 'were', 'had', 'used to', 'yesterday', 'before'],
-                present: ['am', 'is', 'are', 'feel', 'feeling', 'now', 'currently'],
-                future: ['will', 'going to', 'hope', 'expect', 'tomorrow', 'soon']
+            neutral: {
+                keywords: ['okay', 'fine', 'normal', 'regular', 'usual', 'average'],
+                spiritualContext: 'balanced state',
+                guidance: 'In stillness, there is wisdom. Use this balanced time for reflection',
+                color: '#6b7280',
+                intensity: 'neutral',
+                practices: ['reflection', 'mindfulness', 'preparation']
             }
         };
 
-        // Caching for performance
-        this.analysisCache = new Map();
-        this.userPatternCache = new Map();
-        
-        // Performance metrics
+        // Spiritual traditions and their contexts
+        this.spiritualTraditions = {
+            Islam: {
+                practices: ['salah', 'dhikr', 'dua', 'quran', 'tasbih'],
+                keywords: ['allah', 'prophet', 'islam', 'muslim', 'quran', 'prayer', 'mosque', 'ramadan'],
+                guidance: {
+                    anxious: "Remember Allah's promise: 'And whoever relies upon Allah - then He is sufficient for him.'",
+                    grateful: "Say 'Alhamdulillahi rabbil alameen' - All praise is due to Allah, Lord of the worlds.",
+                    sad: "Allah is with those who are patient. Your trials are a test and purification."
+                }
+            },
+            Christianity: {
+                practices: ['prayer', 'bible study', 'worship', 'communion', 'fellowship'],
+                keywords: ['jesus', 'christ', 'god', 'lord', 'bible', 'church', 'prayer', 'faith'],
+                guidance: {
+                    anxious: "Cast all your anxiety on Him because He cares for you. (1 Peter 5:7)",
+                    grateful: "Give thanks in all circumstances; for this is God's will for you in Christ Jesus.",
+                    sad: "The Lord is close to the brokenhearted and saves those who are crushed in spirit."
+                }
+            },
+            Judaism: {
+                practices: ['prayer', 'torah study', 'shabbat', 'mitzvot', 'meditation'],
+                keywords: ['hashem', 'torah', 'shabbat', 'synagogue', 'rabbi', 'jewish', 'hebrew'],
+                guidance: {
+                    anxious: "Cast your burden upon the Lord, and He will sustain you.",
+                    grateful: "Blessed are You, Lord our God, King of the universe.",
+                    sad: "The Lord is near to all who call upon Him in truth."
+                }
+            },
+            Universal: {
+                practices: ['meditation', 'mindfulness', 'gratitude', 'compassion', 'service'],
+                keywords: ['universe', 'energy', 'consciousness', 'mindfulness', 'compassion'],
+                guidance: {
+                    anxious: "You are connected to the infinite source of peace and strength.",
+                    grateful: "Gratitude opens the door to abundance and joy.",
+                    sad: "This too shall pass. You are held by love greater than you know."
+                }
+            }
+        };
+
+        // Performance monitoring
         this.metrics = {
             totalAnalyses: 0,
             averageProcessingTime: 0,
-            accuracyScore: 0,
+            accuracyFeedback: [],
             cacheHitRate: 0
         };
 
+        // Simple cache for repeated analyses
+        this.analysisCache = new Map();
+        this.userContextCache = new Map();
+
+        // Setup cleanup intervals
         this.setupCleanupIntervals();
     }
 
     /**
-     * Main method to analyze mood from various input types
+     * Main mood analysis method
      * @param {string} userId - User ID
-     * @param {Object} input - Input data with type and content
+     * @param {Object} input - Input data (text, audio, image)
      * @param {Object} options - Analysis options
      * @returns {Object} Comprehensive mood analysis results
      */
@@ -116,848 +155,740 @@ class MoodDetectionService {
 
         try {
             const {
-                type = 'text', // text, voice, image, combined
-                content,
-                audioData,
-                imageData,
-                context = {},
                 includeInsights = true,
                 includeSuggestions = true,
-                saveToHistory = true
-            } = input;
+                saveToHistory = true,
+                priority = 'normal'
+            } = options;
 
             // Validate input
-            this.validateInput(type, content, audioData, imageData);
+            this.validateInput(input);
 
-            // Check cache for similar analyses
-            const cacheKey = this.generateCacheKey(userId, input);
-            const cachedResult = this.analysisCache.get(cacheKey);
-            if (cachedResult && !options.forceRefresh) {
-                this.metrics.cacheHitRate++;
-                return this.enhanceWithUserContext(cachedResult, userId);
-            }
+            // Get user context for personalization
+            const userContext = await this.getUserContext(userId);
 
-            let moodAnalysis = {};
-
-            // Perform analysis based on input type
-            switch (type) {
+            // Perform emotion analysis based on input type
+            let analysisResult;
+            switch (input.type) {
                 case 'text':
-                    moodAnalysis = await this.analyzeTextMood(content, context);
+                    analysisResult = await this.analyzeTextMood(input.content, userContext);
                     break;
                 case 'voice':
-                    moodAnalysis = await this.analyzeVoiceMood(audioData, content, context);
+                    analysisResult = await this.analyzeVoiceMood(input.audioData, input.content, userContext);
                     break;
                 case 'image':
-                    moodAnalysis = await this.analyzeImageMood(imageData, context);
+                    analysisResult = await this.analyzeImageMood(input.imageData, userContext);
                     break;
                 case 'combined':
-                    moodAnalysis = await this.analyzeCombinedMood(content, audioData, imageData, context);
+                    analysisResult = await this.analyzeCombinedMood(input, userContext);
                     break;
                 default:
-                    throw new Error(`Unsupported analysis type: ${type}`);
+                    throw new Error('Invalid input type');
             }
 
-            // Enhance with user-specific patterns
-            const enhancedAnalysis = await this.enhanceWithUserContext(moodAnalysis, userId);
+            // Enhance with spiritual context
+            const spiritualContext = await this.analyzeSpiritualContext(
+                input.content || '', 
+                userContext
+            );
 
-            // Generate insights and suggestions
+            // Generate insights if requested
+            let insights = [];
             if (includeInsights) {
-                enhancedAnalysis.insights = await this.generateInsights(enhancedAnalysis, userId);
+                insights = await this.generateInsights(analysisResult, spiritualContext, userContext);
             }
 
+            // Generate suggestions if requested
+            let suggestions = [];
             if (includeSuggestions) {
-                enhancedAnalysis.suggestions = await this.generateSuggestions(enhancedAnalysis, userId);
+                suggestions = await this.generateSuggestions(analysisResult, spiritualContext, userContext);
             }
 
-            // Save to user's mood history
-            if (saveToHistory) {
-                await this.saveMoodEntry(userId, enhancedAnalysis, input);
-            }
+            // Get personalized guidance
+            const personalizedGuidance = await this.getPersonalizedGuidance(
+                analysisResult, 
+                spiritualContext, 
+                userContext
+            );
 
-            // Cache the result
-            this.analysisCache.set(cacheKey, enhancedAnalysis);
-            this.limitCacheSize();
+            const processingTime = Date.now() - startTime;
+            this.updateMetrics(processingTime);
 
-            // Update metrics
-            this.updateMetrics(startTime);
-
-            // Log the analysis
-            await this.logAnalysis(userId, input, enhancedAnalysis);
-
-            return {
-                ...enhancedAnalysis,
-                processingTime: Date.now() - startTime,
+            // Prepare comprehensive result
+            const result = {
+                primaryEmotion: analysisResult.emotion,
+                confidence: analysisResult.confidence,
+                intensity: this.calculateIntensity(analysisResult),
+                emotions: analysisResult.scores || { [analysisResult.emotion]: analysisResult.confidence },
+                analysisType: input.type,
+                spiritualContext,
+                insights,
+                suggestions,
+                userContext: {
+                    spiritualBackground: userContext.spiritualBackground,
+                    emotionalPatterns: userContext.emotionalPatterns,
+                    analysisHistory: userContext.analysisHistory
+                },
+                personalizedGuidance,
+                processingTime,
                 timestamp: new Date().toISOString(),
-                cacheUsed: false
+                cacheUsed: this.analysisCache.has(this.generateCacheKey(input, userId))
             };
 
+            // Save to history if requested
+            if (saveToHistory) {
+                await this.saveMoodEntry(userId, result, input);
+            }
+
+            return result;
+
         } catch (error) {
-            console.error('Mood Detection Error:', error);
-            await this.logError(userId, error, input);
-            throw new Error(this.getErrorMessage(error));
+            console.error('Mood Analysis Error:', error);
+            throw new Error(`Mood analysis failed: ${error.message}`);
         }
     }
 
     /**
-     * Advanced text mood analysis with NLP techniques
+     * Analyze text-based mood with enhanced NLP
      */
-    async analyzeTextMood(text, context = {}) {
+    async analyzeTextMood(text, userContext) {
         try {
-            // Preprocess text
-            const processedText = this.preprocessText(text);
-            
-            // Basic emotion detection
-            const basicEmotion = await analyzeTextEmotion(text);
-            
-            // Advanced pattern analysis
-            const patterns = this.analyzeTextPatterns(processedText);
-            
-            // Sentiment analysis with context
-            const sentiment = this.analyzeSentiment(processedText, context);
-            
-            // Spiritual context detection
-            const spiritualContext = this.detectSpiritualContext(processedText);
-            
-            // Combine all analyses
-            const combinedAnalysis = this.combineTextAnalyses(
-                basicEmotion, 
-                patterns, 
-                sentiment, 
-                spiritualContext
-            );
+            // Check cache first
+            const cacheKey = this.generateTextCacheKey(text);
+            if (this.analysisCache.has(cacheKey)) {
+                this.metrics.cacheHitRate++;
+                return this.analysisCache.get(cacheKey);
+            }
 
-            return {
-                primaryEmotion: combinedAnalysis.emotion,
-                confidence: combinedAnalysis.confidence,
-                intensity: combinedAnalysis.intensity,
-                emotions: combinedAnalysis.emotionScores,
-                sentiment: sentiment,
-                spiritualContext: spiritualContext,
-                textMetrics: {
-                    wordCount: processedText.split(' ').length,
-                    sentenceCount: processedText.split(/[.!?]+/).length,
-                    emotionalWords: patterns.emotionalWords,
-                    spiritualWords: patterns.spiritualWords
-                },
-                analysisType: 'text'
-            };
+            // Enhanced text analysis using multiple approaches
+            const basicAnalysis = await analyzeTextEmotion(text);
+            const nlpAnalysis = await this.performNLPAnalysis(text);
+            const contextualAnalysis = await this.performContextualAnalysis(text, userContext);
+
+            // Combine analyses with weighted scoring
+            const combinedResult = this.combineAnalyses([
+                { result: basicAnalysis, weight: 0.4 },
+                { result: nlpAnalysis, weight: 0.3 },
+                { result: contextualAnalysis, weight: 0.3 }
+            ]);
+
+            // Cache the result
+            this.analysisCache.set(cacheKey, combinedResult);
+            
+            return combinedResult;
 
         } catch (error) {
             console.error('Text mood analysis error:', error);
-            return this.getFallbackAnalysis('text');
+            return { emotion: 'neutral', confidence: 0.5, scores: { neutral: 0.5 } };
         }
     }
 
     /**
-     * Voice mood analysis (placeholder for future implementation)
+     * Analyze voice-based mood (currently uses transcript analysis)
      */
-    async analyzeVoiceMood(audioData, transcript, context = {}) {
+    async analyzeVoiceMood(audioData, transcript, userContext) {
         try {
             // For now, analyze the transcript if available
             if (transcript) {
-                const textAnalysis = await this.analyzeTextMood(transcript, context);
+                const textAnalysis = await this.analyzeTextMood(transcript, userContext);
+                
+                // Future: Add actual audio analysis here
+                // const audioFeatures = await this.extractAudioFeatures(audioData);
+                // const voiceAnalysis = await this.analyzeVoiceFeatures(audioFeatures);
+                
                 return {
                     ...textAnalysis,
-                    analysisType: 'voice',
-                    audioMetrics: {
-                        hasAudio: !!audioData,
-                        transcriptAvailable: !!transcript,
-                        note: 'Voice analysis currently uses transcript. Audio analysis coming soon.'
-                    }
+                    analysisMethod: 'transcript', // Will be 'voice' when audio analysis is implemented
+                    hasAudioData: !!audioData
                 };
             }
 
-            // Placeholder for future audio analysis
-            return {
-                primaryEmotion: 'neutral',
-                confidence: 0.5,
-                intensity: 'medium',
-                emotions: { neutral: 1.0 },
-                analysisType: 'voice',
-                audioMetrics: {
-                    hasAudio: !!audioData,
-                    transcriptAvailable: false,
-                    note: 'Audio-only analysis not yet implemented'
-                }
-            };
+            return { emotion: 'neutral', confidence: 0.5, scores: { neutral: 0.5 } };
 
         } catch (error) {
             console.error('Voice mood analysis error:', error);
-            return this.getFallbackAnalysis('voice');
+            return { emotion: 'neutral', confidence: 0.5, scores: { neutral: 0.5 } };
         }
     }
 
     /**
-     * Image mood analysis (placeholder for future implementation)
+     * Analyze image-based mood (placeholder for future implementation)
      */
-    async analyzeImageMood(imageData, context = {}) {
+    async analyzeImageMood(imageData, userContext) {
         try {
-            // Placeholder for future image analysis
-            // This would integrate with computer vision APIs or local models
-            
-            return {
-                primaryEmotion: 'neutral',
-                confidence: 0.5,
-                intensity: 'medium',
-                emotions: { neutral: 1.0 },
-                analysisType: 'image',
-                imageMetrics: {
-                    hasImage: !!imageData,
-                    note: 'Image mood analysis coming soon'
-                }
+            // Future: Implement actual image emotion analysis
+            // This would involve:
+            // 1. Face detection
+            // 2. Facial expression analysis
+            // 3. Color psychology analysis
+            // 4. Contextual scene analysis
+
+            return { 
+                emotion: 'neutral', 
+                confidence: 0.5, 
+                scores: { neutral: 0.5 },
+                analysisMethod: 'placeholder',
+                hasImageData: !!imageData
             };
 
         } catch (error) {
             console.error('Image mood analysis error:', error);
-            return this.getFallbackAnalysis('image');
+            return { emotion: 'neutral', confidence: 0.5, scores: { neutral: 0.5 } };
         }
     }
 
     /**
-     * Combined multi-modal analysis
+     * Analyze combined inputs (text + voice + image)
      */
-    async analyzeCombinedMood(text, audioData, imageData, context = {}) {
+    async analyzeCombinedMood(input, userContext) {
         try {
             const analyses = [];
 
-            if (text) {
-                const textAnalysis = await this.analyzeTextMood(text, context);
-                analyses.push({ ...textAnalysis, weight: 0.6 });
+            if (input.content) {
+                const textAnalysis = await this.analyzeTextMood(input.content, userContext);
+                analyses.push({ result: textAnalysis, weight: 0.5 });
             }
 
-            if (audioData) {
-                const voiceAnalysis = await this.analyzeVoiceMood(audioData, text, context);
-                analyses.push({ ...voiceAnalysis, weight: 0.3 });
+            if (input.audioData) {
+                const voiceAnalysis = await this.analyzeVoiceMood(input.audioData, input.content, userContext);
+                analyses.push({ result: voiceAnalysis, weight: 0.3 });
             }
 
-            if (imageData) {
-                const imageAnalysis = await this.analyzeImageMood(imageData, context);
-                analyses.push({ ...imageAnalysis, weight: 0.1 });
+            if (input.imageData) {
+                const imageAnalysis = await this.analyzeImageMood(input.imageData, userContext);
+                analyses.push({ result: imageAnalysis, weight: 0.2 });
             }
 
             if (analyses.length === 0) {
-                throw new Error('No valid input provided for analysis');
+                throw new Error('No valid input provided for combined analysis');
             }
 
-            // Combine analyses with weighted average
-            return this.combineMultiModalAnalyses(analyses);
+            return this.combineAnalyses(analyses);
 
         } catch (error) {
             console.error('Combined mood analysis error:', error);
-            return this.getFallbackAnalysis('combined');
+            return { emotion: 'neutral', confidence: 0.5, scores: { neutral: 0.5 } };
         }
     }
 
     /**
-     * Advanced text preprocessing
+     * Perform advanced NLP analysis using natural library
      */
-    preprocessText(text) {
-        return text
-            .toLowerCase()
-            .replace(/[^\w\s]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-    }
-
-    /**
-     * Analyze text patterns for emotional indicators
-     */
-    analyzeTextPatterns(text) {
-        const words = text.split(' ');
-        const emotionalWords = [];
-        const spiritualWords = [];
-        const intensityModifiers = [];
-        const negations = [];
-
-        words.forEach((word, index) => {
-            // Check for emotional words
-            Object.entries(this.emotionCategories).forEach(([emotion, data]) => {
-                if (data.keywords.includes(word)) {
-                    emotionalWords.push({ word, emotion, position: index });
-                }
-            });
-
-            // Check for spiritual words
-            if (this.emotionCategories.spiritual.keywords.includes(word)) {
-                spiritualWords.push({ word, position: index });
-            }
-
-            // Check for intensity modifiers
-            Object.entries(this.emotionPatterns.intensity_modifiers).forEach(([level, modifiers]) => {
-                if (modifiers.includes(word)) {
-                    intensityModifiers.push({ word, level, position: index });
-                }
-            });
-
-            // Check for negations
-            if (this.emotionPatterns.negation_words.includes(word)) {
-                negations.push({ word, position: index });
-            }
-        });
-
-        return {
-            emotionalWords,
-            spiritualWords,
-            intensityModifiers,
-            negations,
-            wordCount: words.length
-        };
-    }
-
-    /**
-     * Sentiment analysis with contextual awareness
-     */
-    analyzeSentiment(text, context) {
-        const analyzer = new natural.SentimentAnalyzer('English', 
-            natural.PorterStemmer, ['negation']);
-        const tokenizer = new natural.WordTokenizer();
-        
-        const tokens = tokenizer.tokenize(text);
-        const score = analyzer.getSentiment(tokens);
-        
-        // Adjust sentiment based on context
-        let adjustedScore = score;
-        if (context.timeOfDay === 'night' && score < 0) {
-            adjustedScore = score * 1.2; // Amplify negative sentiment at night
-        }
-        
-        return {
-            score: adjustedScore,
-            comparative: adjustedScore / tokens.length,
-            tokens: tokens.length,
-            positive: adjustedScore > 0.1,
-            negative: adjustedScore < -0.1,
-            neutral: Math.abs(adjustedScore) <= 0.1
-        };
-    }
-
-    /**
-     * Detect spiritual context in text
-     */
-    detectSpiritualContext(text) {
-        const spiritualKeywords = this.emotionCategories.spiritual.keywords;
-        const religiousTerms = ['christian', 'muslim', 'jewish', 'hindu', 'buddhist', 'sikh'];
-        const practiceTerms = ['meditation', 'prayer', 'worship', 'service', 'ritual', 'ceremony'];
-        
-        const foundSpiritual = spiritualKeywords.filter(keyword => text.includes(keyword));
-        const foundReligious = religiousTerms.filter(term => text.includes(term));
-        const foundPractices = practiceTerms.filter(practice => text.includes(practice));
-        
-        const spiritualScore = (foundSpiritual.length + foundReligious.length + foundPractices.length) / 
-                              (spiritualKeywords.length + religiousTerms.length + practiceTerms.length);
-        
-        return {
-            isSpiritual: spiritualScore > 0.1,
-            score: spiritualScore,
-            detectedTerms: {
-                spiritual: foundSpiritual,
-                religious: foundReligious,
-                practices: foundPractices
-            },
-            suggestedTradition: foundReligious[0] || null
-        };
-    }
-
-    /**
-     * Combine multiple text analyses into final result
-     */
-    combineTextAnalyses(basicEmotion, patterns, sentiment, spiritualContext) {
-        let finalEmotion = basicEmotion.emotion;
-        let finalConfidence = basicEmotion.confidence;
-        
-        // Adjust based on patterns
-        if (patterns.intensityModifiers.length > 0) {
-            const avgIntensity = patterns.intensityModifiers.reduce((sum, mod) => {
-                const intensityValues = { low: 0.3, medium: 0.6, high: 0.9 };
-                return sum + intensityValues[mod.level];
-            }, 0) / patterns.intensityModifiers.length;
-            
-            finalConfidence = Math.min(finalConfidence * (1 + avgIntensity), 0.95);
-        }
-        
-        // Adjust for negations
-        if (patterns.negations.length > 0) {
-            finalConfidence *= 0.8; // Reduce confidence when negations are present
-        }
-        
-        // Boost spiritual emotion if spiritual context is strong
-        if (spiritualContext.isSpiritual && spiritualContext.score > 0.3) {
-            if (finalEmotion !== 'spiritual') {
-                // Create mixed emotion result
-                return {
-                    emotion: 'spiritual',
-                    confidence: Math.max(finalConfidence, spiritualContext.score),
-                    intensity: this.calculateIntensity(finalConfidence),
-                    emotionScores: {
-                        ...basicEmotion.scores,
-                        spiritual: spiritualContext.score,
-                        [finalEmotion]: finalConfidence
-                    },
-                    mixedEmotions: [finalEmotion, 'spiritual']
-                };
-            }
-        }
-        
-        return {
-            emotion: finalEmotion,
-            confidence: finalConfidence,
-            intensity: this.calculateIntensity(finalConfidence),
-            emotionScores: basicEmotion.scores || {}
-        };
-    }
-
-    /**
-     * Calculate emotion intensity based on confidence
-     */
-    calculateIntensity(confidence) {
-        if (confidence >= 0.8) return 'high';
-        if (confidence >= 0.6) return 'medium';
-        return 'low';
-    }
-
-    /**
-     * Combine multi-modal analyses
-     */
-    combineMultiModalAnalyses(analyses) {
-        const weightedEmotions = {};
-        let totalWeight = 0;
-        let totalConfidence = 0;
-
-        analyses.forEach(analysis => {
-            const weight = analysis.weight || 1;
-            totalWeight += weight;
-            totalConfidence += analysis.confidence * weight;
-
-            Object.entries(analysis.emotions || {}).forEach(([emotion, score]) => {
-                if (!weightedEmotions[emotion]) {
-                    weightedEmotions[emotion] = 0;
-                }
-                weightedEmotions[emotion] += score * weight;
-            });
-        });
-
-        // Normalize weighted emotions
-        Object.keys(weightedEmotions).forEach(emotion => {
-            weightedEmotions[emotion] /= totalWeight;
-        });
-
-        // Find primary emotion
-        const primaryEmotion = Object.keys(weightedEmotions).reduce((a, b) => 
-            weightedEmotions[a] > weightedEmotions[b] ? a : b
-        );
-
-        return {
-            primaryEmotion,
-            confidence: totalConfidence / totalWeight,
-            intensity: this.calculateIntensity(totalConfidence / totalWeight),
-            emotions: weightedEmotions,
-            analysisType: 'combined',
-            modalityBreakdown: analyses.map(a => ({
-                type: a.analysisType,
-                emotion: a.primaryEmotion,
-                confidence: a.confidence,
-                weight: a.weight
-            }))
-        };
-    }
-
-    /**
-     * Enhance analysis with user-specific context and patterns
-     */
-    async enhanceWithUserContext(analysis, userId) {
+    async performNLPAnalysis(text) {
         try {
-            const user = await User.findById(userId);
-            const userPatterns = await this.getUserEmotionPatterns(userId);
-            
-            let enhancedAnalysis = { ...analysis };
+            const tokenizer = new natural.WordTokenizer();
+            const stemmer = natural.PorterStemmer;
+            const sentiment = new natural.SentimentAnalyzer('English', 
+                natural.PorterStemmer, 'afinn');
 
-            // Adjust based on user's historical patterns
-            if (userPatterns.dominantEmotions.length > 0) {
-                const userDominantEmotion = userPatterns.dominantEmotions[0];
-                if (userDominantEmotion === analysis.primaryEmotion) {
-                    enhancedAnalysis.confidence = Math.min(analysis.confidence * 1.1, 0.95);
-                    enhancedAnalysis.userPattern = 'consistent';
-                } else {
-                    enhancedAnalysis.userPattern = 'shifting';
-                }
+            // Tokenize and stem
+            const tokens = tokenizer.tokenize(text.toLowerCase());
+            const stemmedTokens = tokens.map(token => stemmer.stem(token));
+
+            // Sentiment analysis
+            const sentimentScore = sentiment.getSentiment(stemmedTokens);
+
+            // Map sentiment to emotions
+            let emotion = 'neutral';
+            let confidence = 0.5;
+
+            if (sentimentScore > 0.3) {
+                emotion = 'joyful';
+                confidence = Math.min(0.6 + (sentimentScore * 0.3), 0.95);
+            } else if (sentimentScore < -0.3) {
+                emotion = 'sad';
+                confidence = Math.min(0.6 + (Math.abs(sentimentScore) * 0.3), 0.95);
+            } else if (sentimentScore > 0.1) {
+                emotion = 'peaceful';
+                confidence = 0.6;
+            } else if (sentimentScore < -0.1) {
+                emotion = 'anxious';
+                confidence = 0.6;
             }
 
-            // Add user context
-            enhancedAnalysis.userContext = {
-                spiritualBackground: user?.spiritualPreferences?.religion || null,
-                emotionalPatterns: userPatterns,
-                analysisHistory: userPatterns.totalAnalyses
+            return {
+                emotion,
+                confidence,
+                scores: { [emotion]: confidence },
+                sentimentScore,
+                method: 'nlp'
             };
 
-            // Add personalized spiritual guidance
-            if (user?.spiritualPreferences) {
-                enhancedAnalysis.personalizedGuidance = this.getPersonalizedGuidance(
-                    analysis.primaryEmotion,
-                    user.spiritualPreferences
-                );
+        } catch (error) {
+            console.error('NLP analysis error:', error);
+            return { emotion: 'neutral', confidence: 0.5, scores: { neutral: 0.5 } };
+        }
+    }
+
+    /**
+     * Perform contextual analysis based on user history
+     */
+    async performContextualAnalysis(text, userContext) {
+        try {
+            // Analyze based on user's emotional patterns
+            const recentEmotions = userContext.emotionalPatterns?.dominantEmotions || [];
+            const timeOfDay = new Date().getHours();
+            
+            let contextualEmotion = 'neutral';
+            let confidence = 0.5;
+
+            // Time-based context
+            if (timeOfDay < 6 || timeOfDay > 22) {
+                // Late night/early morning - might indicate anxiety or reflection
+                if (text.includes('can\'t sleep') || text.includes('worried')) {
+                    contextualEmotion = 'anxious';
+                    confidence = 0.7;
+                }
+            } else if (timeOfDay >= 6 && timeOfDay < 12) {
+                // Morning - often more positive
+                if (text.includes('new day') || text.includes('morning')) {
+                    contextualEmotion = 'hopeful';
+                    confidence = 0.6;
+                }
             }
 
-            return enhancedAnalysis;
+            // Pattern-based context
+            if (recentEmotions.length > 0) {
+                const dominantEmotion = recentEmotions[0];
+                // If user has been consistently sad, neutral text might still indicate sadness
+                if (dominantEmotion === 'sad' && contextualEmotion === 'neutral') {
+                    contextualEmotion = 'sad';
+                    confidence = 0.6;
+                }
+            }
+
+            return {
+                emotion: contextualEmotion,
+                confidence,
+                scores: { [contextualEmotion]: confidence },
+                method: 'contextual'
+            };
 
         } catch (error) {
-            console.error('Error enhancing with user context:', error);
-            return analysis; // Return original analysis if enhancement fails
+            console.error('Contextual analysis error:', error);
+            return { emotion: 'neutral', confidence: 0.5, scores: { neutral: 0.5 } };
         }
     }
 
     /**
-     * Generate insights based on mood analysis
+     * Combine multiple analysis results with weighted scoring
      */
-    async generateInsights(analysis, userId) {
-        const insights = [];
-        const emotion = analysis.primaryEmotion;
-        const confidence = analysis.confidence;
-        const userPatterns = await this.getUserEmotionPatterns(userId);
+    combineAnalyses(analyses) {
+        try {
+            const emotionScores = {};
+            let totalWeight = 0;
 
-        // Confidence-based insights
-        if (confidence > 0.8) {
-            insights.push({
-                type: 'confidence',
-                message: `Your ${emotion} emotion comes through very clearly in your expression.`,
-                icon: '🎯'
+            // Combine weighted scores
+            analyses.forEach(({ result, weight }) => {
+                totalWeight += weight;
+                
+                if (result.scores) {
+                    Object.entries(result.scores).forEach(([emotion, score]) => {
+                        if (!emotionScores[emotion]) {
+                            emotionScores[emotion] = 0;
+                        }
+                        emotionScores[emotion] += score * weight;
+                    });
+                } else {
+                    // Single emotion result
+                    if (!emotionScores[result.emotion]) {
+                        emotionScores[result.emotion] = 0;
+                    }
+                    emotionScores[result.emotion] += result.confidence * weight;
+                }
             });
-        } else if (confidence < 0.5) {
-            insights.push({
-                type: 'uncertainty',
-                message: 'Your emotions seem mixed right now, which is completely normal.',
-                icon: '🌊'
+
+            // Normalize scores
+            Object.keys(emotionScores).forEach(emotion => {
+                emotionScores[emotion] /= totalWeight;
             });
+
+            // Find dominant emotion
+            const dominantEmotion = Object.keys(emotionScores).reduce((a, b) => 
+                emotionScores[a] > emotionScores[b] ? a : b
+            );
+
+            return {
+                emotion: dominantEmotion,
+                confidence: emotionScores[dominantEmotion],
+                scores: emotionScores,
+                method: 'combined'
+            };
+
+        } catch (error) {
+            console.error('Analysis combination error:', error);
+            return { emotion: 'neutral', confidence: 0.5, scores: { neutral: 0.5 } };
         }
+    }
 
-        // Pattern-based insights
-        if (userPatterns.recentTrend) {
-            if (userPatterns.recentTrend === 'improving') {
-                insights.push({
-                    type: 'trend',
-                    message: 'Your emotional well-being has been trending positively recently.',
-                    icon: '📈'
+    /**
+     * Analyze spiritual context in the text
+     */
+    async analyzeSpiritualContext(text, userContext) {
+        try {
+            const textLower = text.toLowerCase();
+            let spiritualScore = 0;
+            let detectedTerms = {
+                spiritual: [],
+                religious: [],
+                practices: []
+            };
+            let suggestedTradition = null;
+
+            // Check for spiritual/religious terms
+            Object.entries(this.spiritualTraditions).forEach(([tradition, data]) => {
+                let traditionScore = 0;
+                
+                data.keywords.forEach(keyword => {
+                    if (textLower.includes(keyword)) {
+                        traditionScore += 1;
+                        spiritualScore += 0.1;
+                        detectedTerms.religious.push(keyword);
+                    }
                 });
-            } else if (userPatterns.recentTrend === 'declining') {
+
+                data.practices.forEach(practice => {
+                    if (textLower.includes(practice)) {
+                        traditionScore += 1;
+                        spiritualScore += 0.15;
+                        detectedTerms.practices.push(practice);
+                    }
+                });
+
+                if (traditionScore > 0 && (!suggestedTradition || traditionScore > suggestedTradition.score)) {
+                    suggestedTradition = { tradition, score: traditionScore };
+                }
+            });
+
+            // Check for general spiritual terms
+            const generalSpiritualTerms = [
+                'soul', 'spirit', 'divine', 'sacred', 'holy', 'blessed', 'prayer', 
+                'meditation', 'faith', 'belief', 'worship', 'gratitude', 'peace',
+                'love', 'compassion', 'forgiveness', 'wisdom', 'truth', 'light'
+            ];
+
+            generalSpiritualTerms.forEach(term => {
+                if (textLower.includes(term)) {
+                    spiritualScore += 0.05;
+                    detectedTerms.spiritual.push(term);
+                }
+            });
+
+            // Consider user's spiritual background
+            if (userContext.spiritualBackground) {
+                spiritualScore += 0.1; // Boost if user has spiritual background
+            }
+
+            const isSpiritual = spiritualScore > 0.2;
+
+            return {
+                isSpiritual,
+                score: Math.min(spiritualScore, 1.0),
+                detectedTerms,
+                suggestedTradition: suggestedTradition?.tradition || userContext.spiritualBackground
+            };
+
+        } catch (error) {
+            console.error('Spiritual context analysis error:', error);
+            return {
+                isSpiritual: false,
+                score: 0,
+                detectedTerms: { spiritual: [], religious: [], practices: [] }
+            };
+        }
+    }
+
+    /**
+     * Generate insights based on analysis results
+     */
+    async generateInsights(analysisResult, spiritualContext, userContext) {
+        const insights = [];
+
+        try {
+            // Confidence-based insights
+            if (analysisResult.confidence > 0.8) {
                 insights.push({
-                    type: 'trend',
-                    message: 'You might benefit from some extra self-care and spiritual support.',
-                    icon: '💝'
+                    type: 'confidence',
+                    message: `Your ${analysisResult.emotion} emotion comes through very clearly in your expression.`,
+                    icon: '🎯'
+                });
+            } else if (analysisResult.confidence < 0.6) {
+                insights.push({
+                    type: 'uncertainty',
+                    message: 'Your emotions seem mixed right now, which is completely normal.',
+                    icon: '🤔'
                 });
             }
+
+            // Spiritual insights
+            if (spiritualContext.isSpiritual) {
+                insights.push({
+                    type: 'spiritual',
+                    message: 'I notice spiritual themes in your thoughts. Your faith journey is important.',
+                    icon: '✨'
+                });
+            }
+
+            // Pattern-based insights
+            if (userContext.emotionalPatterns?.recentTrend) {
+                const trend = userContext.emotionalPatterns.recentTrend;
+                if (trend === 'improving') {
+                    insights.push({
+                        type: 'trend',
+                        message: 'Your emotional well-being has been trending positively recently.',
+                        icon: '📈'
+                    });
+                } else if (trend === 'declining') {
+                    insights.push({
+                        type: 'trend',
+                        message: 'I notice you\'ve been going through some challenges lately. You\'re not alone.',
+                        icon: '🤗'
+                    });
+                }
+            }
+
+            // Time-based insights
+            const hour = new Date().getHours();
+            if (hour < 6 && analysisResult.emotion === 'anxious') {
+                insights.push({
+                    type: 'temporal',
+                    message: 'Late-night anxiety is common. Consider some calming practices before sleep.',
+                    icon: '🌙'
+                });
+            }
+
+        } catch (error) {
+            console.error('Insight generation error:', error);
         }
 
-        // Spiritual insights
-        if (analysis.spiritualContext?.isSpiritual) {
-            insights.push({
-                type: 'spiritual',
-                message: 'Your spiritual awareness is shining through your words.',
-                icon: '✨'
-            });
-        }
-
-        // Time-based insights
-        const hour = new Date().getHours();
-        if (hour < 6 && (emotion === 'anxious' || emotion === 'sad')) {
-            insights.push({
-                type: 'temporal',
-                message: 'Early morning emotions can feel more intense. Consider gentle morning prayers.',
-                icon: '🌅'
-            });
-        }
-
-        return insights.slice(0, 3); // Limit to 3 insights
+        return insights;
     }
 
     /**
-     * Generate personalized suggestions based on mood
+     * Generate personalized suggestions based on analysis
      */
-    async generateSuggestions(analysis, userId) {
-        const emotion = analysis.primaryEmotion;
-        const emotionData = this.emotionCategories[emotion];
+    async generateSuggestions(analysisResult, spiritualContext, userContext) {
         const suggestions = [];
 
-        // Base suggestions from emotion category
-        if (emotionData) {
-            suggestions.push({
-                type: 'spiritual',
-                title: 'Spiritual Guidance',
-                description: emotionData.guidance,
-                action: 'spiritual_guidance',
-                icon: '🙏'
-            });
-        }
+        try {
+            const emotion = analysisResult.emotion;
+            const intensity = this.calculateIntensity(analysisResult);
+            const tradition = spiritualContext.suggestedTradition || 'Universal';
 
-        // Emotion-specific suggestions
-        switch (emotion) {
-            case 'anxious':
-                suggestions.push(
-                    {
-                        type: 'breathing',
-                        title: 'Breathing Exercise',
-                        description: 'Try a 4-7-8 breathing pattern to calm your nervous system',
-                        action: 'breathing_exercise',
-                        icon: '🫁'
-                    },
-                    {
-                        type: 'prayer',
-                        title: 'Calming Prayer',
-                        description: 'Recite a prayer or mantra for peace and comfort',
-                        action: 'prayer_session',
-                        icon: '🤲'
-                    }
-                );
-                break;
+            // Emotion-specific suggestions
+            switch (emotion) {
+                case 'anxious':
+                    suggestions.push(
+                        {
+                            type: 'breathing',
+                            title: 'Breathing Exercise',
+                            description: 'Try a 4-7-8 breathing pattern to calm your nervous system',
+                            action: 'breathing_exercise',
+                            icon: '🫁'
+                        },
+                        {
+                            type: 'prayer',
+                            title: 'Calming Prayer',
+                            description: 'Take a moment for prayer or meditation to find peace',
+                            action: 'prayer_time',
+                            icon: '🤲'
+                        }
+                    );
+                    break;
 
-            case 'sad':
-                suggestions.push(
-                    {
-                        type: 'gratitude',
-                        title: 'Gratitude Practice',
-                        description: 'List three things you\'re grateful for today',
-                        action: 'gratitude_journal',
-                        icon: '📝'
-                    },
-                    {
-                        type: 'connection',
-                        title: 'Reach Out',
-                        description: 'Connect with a friend, family member, or spiritual community',
-                        action: 'social_connection',
-                        icon: '💬'
-                    }
-                );
-                break;
+                case 'sad':
+                    suggestions.push(
+                        {
+                            type: 'gratitude',
+                            title: 'Gratitude Practice',
+                            description: 'List three things you\'re grateful for today',
+                            action: 'gratitude_practice',
+                            icon: '🙏'
+                        },
+                        {
+                            type: 'connection',
+                            title: 'Reach Out',
+                            description: 'Connect with someone who cares about you',
+                            action: 'social_connection',
+                            icon: '💬'
+                        }
+                    );
+                    break;
 
-            case 'joyful':
-                suggestions.push(
-                    {
-                        type: 'sharing',
-                        title: 'Share Your Joy',
-                        description: 'Share this positive energy with others in your community',
-                        action: 'share_joy',
-                        icon: '✨'
-                    },
-                    {
-                        type: 'gratitude',
-                        title: 'Express Gratitude',
-                        description: 'Take a moment to thank the divine for this blessing',
-                        action: 'gratitude_prayer',
-                        icon: '🙏'
-                    }
-                );
-                break;
+                case 'joyful':
+                    suggestions.push(
+                        {
+                            type: 'sharing',
+                            title: 'Share Your Joy',
+                            description: 'Share this positive energy with others around you',
+                            action: 'share_joy',
+                            icon: '✨'
+                        },
+                        {
+                            type: 'gratitude',
+                            title: 'Express Gratitude',
+                            description: 'Take a moment to thank the divine for this blessing',
+                            action: 'gratitude_prayer',
+                            icon: '🙏'
+                        }
+                    );
+                    break;
 
-            case 'spiritual':
-                suggestions.push(
-                    {
-                        type: 'meditation',
-                        title: 'Deepen Your Practice',
-                        description: 'Spend extra time in meditation or contemplation',
-                        action: 'meditation_session',
-                        icon: '🧘'
-                    },
-                    {
-                        type: 'study',
-                        title: 'Spiritual Reading',
-                        description: 'Read from your sacred texts or spiritual literature',
-                        action: 'spiritual_reading',
-                        icon: '📖'
-                    }
-                );
-                break;
-        }
+                case 'spiritual':
+                    suggestions.push(
+                        {
+                            type: 'meditation',
+                            title: 'Spiritual Reflection',
+                            description: 'Spend time in quiet contemplation and prayer',
+                            action: 'spiritual_reflection',
+                            icon: '🧘'
+                        },
+                        {
+                            type: 'study',
+                            title: 'Sacred Reading',
+                            description: 'Read from your sacred texts for guidance and wisdom',
+                            action: 'sacred_reading',
+                            icon: '📖'
+                        }
+                    );
+                    break;
 
-        // Add tasbih suggestion for Muslim users or general spiritual users
-        const user = await User.findById(userId);
-        if (user?.spiritualPreferences?.religion === 'Islam' || analysis.spiritualContext?.isSpiritual) {
-            suggestions.push({
-                type: 'tasbih',
-                title: 'Digital Tasbih',
-                description: 'Use the digital tasbih for dhikr and remembrance',
-                action: 'tasbih_counter',
-                icon: '📿'
-            });
+                case 'peaceful':
+                    suggestions.push(
+                        {
+                            type: 'meditation',
+                            title: 'Mindful Moment',
+                            description: 'Savor this peaceful state with mindful awareness',
+                            action: 'mindfulness',
+                            icon: '🧘'
+                        }
+                    );
+                    break;
+            }
+
+            // Add tradition-specific suggestions
+            if (tradition === 'Islam') {
+                suggestions.push({
+                    type: 'tasbih',
+                    title: 'Digital Tasbih',
+                    description: 'Use the digital tasbih for dhikr and remembrance',
+                    action: 'tasbih_counter',
+                    icon: '📿'
+                });
+            }
+
+            // Intensity-based suggestions
+            if (intensity === 'high' && ['anxious', 'sad', 'angry'].includes(emotion)) {
+                suggestions.unshift({
+                    type: 'emergency',
+                    title: 'Immediate Support',
+                    description: 'Consider reaching out to a counselor or trusted friend',
+                    action: 'seek_support',
+                    icon: '🆘'
+                });
+            }
+
+        } catch (error) {
+            console.error('Suggestion generation error:', error);
         }
 
         return suggestions.slice(0, 4); // Limit to 4 suggestions
     }
 
     /**
-     * Get personalized spiritual guidance
+     * Get personalized guidance based on user's spiritual background
      */
-    getPersonalizedGuidance(emotion, spiritualPreferences) {
-        const religion = spiritualPreferences.religion?.toLowerCase();
-        const emotionData = this.emotionCategories[emotion];
-        
-        if (!emotionData) return null;
+    async getPersonalizedGuidance(analysisResult, spiritualContext, userContext) {
+        try {
+            const emotion = analysisResult.emotion;
+            const tradition = spiritualContext.suggestedTradition || userContext.spiritualBackground || 'Universal';
+            
+            const traditionData = this.spiritualTraditions[tradition] || this.spiritualTraditions.Universal;
+            const emotionData = this.emotionCategories[emotion] || this.emotionCategories.neutral;
 
-        const baseGuidance = emotionData.guidance;
-        
-        // Customize based on religious background
-        switch (religion) {
-            case 'islam':
-                return {
-                    general: baseGuidance,
-                    specific: this.getIslamicGuidance(emotion),
-                    practices: ['dhikr', 'salah', 'dua', 'quran_recitation']
-                };
-            case 'christianity':
-                return {
-                    general: baseGuidance,
-                    specific: this.getChristianGuidance(emotion),
-                    practices: ['prayer', 'bible_reading', 'worship', 'fellowship']
-                };
-            case 'judaism':
-                return {
-                    general: baseGuidance,
-                    specific: this.getJewishGuidance(emotion),
-                    practices: ['prayer', 'torah_study', 'shabbat', 'mitzvot']
-                };
-            default:
-                return {
-                    general: baseGuidance,
-                    specific: 'Trust in the divine wisdom that guides your path.',
-                    practices: ['meditation', 'prayer', 'reflection', 'gratitude']
-                };
+            return {
+                general: emotionData.guidance,
+                specific: traditionData.guidance[emotion] || traditionData.guidance.anxious || "You are held by love greater than you know.",
+                practices: emotionData.practices || ['reflection', 'mindfulness'],
+                tradition
+            };
+
+        } catch (error) {
+            console.error('Personalized guidance error:', error);
+            return {
+                general: "Your feelings are valid and important. Take time to care for yourself.",
+                specific: "Remember that you are not alone in this journey.",
+                practices: ['reflection', 'self-care'],
+                tradition: 'Universal'
+            };
         }
     }
 
     /**
-     * Get Islamic spiritual guidance for specific emotions
+     * Get user context for personalized analysis
      */
-    getIslamicGuidance(emotion) {
-        const guidance = {
-            anxious: 'Remember Allah\'s promise: "And whoever relies upon Allah - then He is sufficient for him." (Quran 65:3)',
-            sad: 'Know that after hardship comes ease. "So verily, with the hardship, there is relief." (Quran 94:5)',
-            joyful: 'Alhamdulillahi rabbil alameen - All praise belongs to Allah, Lord of all worlds.',
-            grateful: 'Say Alhamdulillah and remember that gratitude increases Allah\'s blessings.',
-            spiritual: 'Continue your dhikr and remember Allah often, for in His remembrance hearts find peace.',
-            peaceful: 'This peace is a gift from Allah. Use this tranquility for worship and reflection.',
-            angry: 'Seek refuge in Allah from Shaytan and perform wudu to cool your anger.',
-            hopeful: 'Place your trust in Allah, for He is the best of planners.'
-        };
-        
-        return guidance[emotion] || 'Trust in Allah\'s wisdom and mercy in all circumstances.';
-    }
-
-    /**
-     * Get Christian spiritual guidance for specific emotions
-     */
-    getChristianGuidance(emotion) {
-        const guidance = {
-            anxious: 'Cast all your anxiety on Him because He cares for you. (1 Peter 5:7)',
-            sad: 'The Lord is close to the brokenhearted and saves those who are crushed in spirit. (Psalm 34:18)',
-            joyful: 'Rejoice in the Lord always. I will say it again: Rejoice! (Philippians 4:4)',
-            grateful: 'Give thanks in all circumstances; for this is God\'s will for you in Christ Jesus. (1 Thessalonians 5:18)',
-            spiritual: 'Draw near to God and He will draw near to you. (James 4:8)',
-            peaceful: 'Peace I leave with you; my peace I give you. (John 14:27)',
-            angry: 'In your anger do not sin. Do not let the sun go down while you are still angry. (Ephesians 4:26)',
-            hopeful: 'For I know the plans I have for you, declares the Lord, plans to prosper you. (Jeremiah 29:11)'
-        };
-        
-        return guidance[emotion] || 'Trust in the Lord with all your heart and lean not on your own understanding.';
-    }
-
-    /**
-     * Get Jewish spiritual guidance for specific emotions
-     */
-    getJewishGuidance(emotion) {
-        const guidance = {
-            anxious: 'Cast your burden upon the Lord, and He will sustain you. (Psalm 55:22)',
-            sad: 'Weeping may endure for a night, but joy comes in the morning. (Psalm 30:5)',
-            joyful: 'Serve the Lord with gladness; come before His presence with singing. (Psalm 100:2)',
-            grateful: 'It is good to give thanks to the Lord and to sing praises to Your name. (Psalm 92:1)',
-            spiritual: 'In every generation, a person must see themselves as if they personally left Egypt.',
-            peaceful: 'Great peace have those who love Your Torah, and nothing can make them stumble. (Psalm 119:165)',
-            angry: 'Slow to anger and abundant in kindness - these are the ways of the righteous.',
-            hopeful: 'Hope in the Lord; be strong and let your heart take courage. (Psalm 27:14)'
-        };
-        
-        return guidance[emotion] || 'The Lord is my shepherd; I shall not want.';
-    }
-
-    /**
-     * Get user's emotion patterns and history
-     */
-    async getUserEmotionPatterns(userId) {
+    async getUserContext(userId) {
         try {
             // Check cache first
-            const cached = this.userPatternCache.get(userId);
-            if (cached && Date.now() - cached.timestamp < 300000) { // 5 minutes
-                return cached.data;
+            if (this.userContextCache.has(userId)) {
+                return this.userContextCache.get(userId);
             }
 
-            const recentEntries = await MoodEntry.find({ userId })
-                .sort({ createdAt: -1 })
-                .limit(30);
+            const user = await User.findById(userId);
+            const recentEntries = await MoodEntry.find({
+                userId,
+                isActive: true,
+                createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } // Last 30 days
+            }).sort({ createdAt: -1 }).limit(20);
 
-            if (recentEntries.length === 0) {
-                return {
-                    dominantEmotions: [],
-                    recentTrend: null,
-                    totalAnalyses: 0,
-                    averageConfidence: 0
-                };
-            }
-
-            // Calculate dominant emotions
+            // Analyze emotional patterns
             const emotionCounts = {};
-            let totalConfidence = 0;
-
             recentEntries.forEach(entry => {
-                const emotion = entry.primaryEmotion;
-                emotionCounts[emotion] = (emotionCounts[emotion] || 0) + 1;
-                totalConfidence += entry.confidence;
+                emotionCounts[entry.primaryEmotion] = (emotionCounts[entry.primaryEmotion] || 0) + 1;
             });
 
             const dominantEmotions = Object.entries(emotionCounts)
                 .sort(([,a], [,b]) => b - a)
+                .slice(0, 3)
                 .map(([emotion]) => emotion);
 
-            // Calculate recent trend (last 7 vs previous 7)
-            const recent7 = recentEntries.slice(0, 7);
-            const previous7 = recentEntries.slice(7, 14);
-            
-            let recentTrend = null;
-            if (recent7.length >= 3 && previous7.length >= 3) {
-                const recentPositive = recent7.filter(e => 
-                    ['joyful', 'grateful', 'peaceful', 'hopeful', 'spiritual'].includes(e.primaryEmotion)
-                ).length;
-                const previousPositive = previous7.filter(e => 
-                    ['joyful', 'grateful', 'peaceful', 'hopeful', 'spiritual'].includes(e.primaryEmotion)
-                ).length;
+            // Determine trend
+            let recentTrend = 'stable';
+            if (recentEntries.length >= 5) {
+                const recent = recentEntries.slice(0, 5);
+                const older = recentEntries.slice(5, 10);
                 
-                if (recentPositive > previousPositive) {
+                const recentPositive = recent.filter(e => ['joyful', 'peaceful', 'grateful', 'hopeful'].includes(e.primaryEmotion)).length;
+                const olderPositive = older.filter(e => ['joyful', 'peaceful', 'grateful', 'hopeful'].includes(e.primaryEmotion)).length;
+                
+                if (recentPositive > olderPositive) {
                     recentTrend = 'improving';
-                } else if (recentPositive < previousPositive) {
+                } else if (recentPositive < olderPositive) {
                     recentTrend = 'declining';
-                } else {
-                    recentTrend = 'stable';
                 }
             }
 
-            const patterns = {
-                dominantEmotions,
-                recentTrend,
-                totalAnalyses: recentEntries.length,
-                averageConfidence: totalConfidence / recentEntries.length,
-                emotionDistribution: emotionCounts
+            const context = {
+                spiritualBackground: user?.spiritualBackground || null,
+                emotionalPatterns: {
+                    dominantEmotions,
+                    recentTrend,
+                    totalAnalyses: recentEntries.length
+                },
+                analysisHistory: recentEntries.length
             };
 
-            // Cache the result
-            this.userPatternCache.set(userId, {
-                data: patterns,
-                timestamp: Date.now()
-            });
-
-            return patterns;
+            // Cache the context
+            this.userContextCache.set(userId, context);
+            
+            return context;
 
         } catch (error) {
-            console.error('Error getting user emotion patterns:', error);
+            console.error('Get user context error:', error);
             return {
-                dominantEmotions: [],
-                recentTrend: null,
-                totalAnalyses: 0,
-                averageConfidence: 0
+                spiritualBackground: null,
+                emotionalPatterns: { dominantEmotions: [], recentTrend: 'stable' },
+                analysisHistory: 0
             };
         }
     }
@@ -965,15 +896,15 @@ class MoodDetectionService {
     /**
      * Save mood entry to database
      */
-    async saveMoodEntry(userId, analysis, input) {
+    async saveMoodEntry(userId, analysisResult, input) {
         try {
             const moodEntry = new MoodEntry({
                 userId,
-                primaryEmotion: analysis.primaryEmotion,
-                confidence: analysis.confidence,
-                intensity: analysis.intensity,
-                emotions: analysis.emotions,
-                analysisType: analysis.analysisType,
+                primaryEmotion: analysisResult.primaryEmotion,
+                confidence: analysisResult.confidence,
+                intensity: analysisResult.intensity,
+                emotions: new Map(Object.entries(analysisResult.emotions)),
+                analysisType: analysisResult.analysisType,
                 inputData: {
                     type: input.type,
                     hasText: !!input.content,
@@ -981,24 +912,29 @@ class MoodDetectionService {
                     hasImage: !!input.imageData,
                     textLength: input.content?.length || 0
                 },
-                spiritualContext: analysis.spiritualContext,
-                insights: analysis.insights,
-                suggestions: analysis.suggestions,
-                userContext: analysis.userContext,
+                spiritualContext: analysisResult.spiritualContext,
+                insights: analysisResult.insights,
+                suggestions: analysisResult.suggestions,
+                userContext: analysisResult.userContext,
+                personalizedGuidance: analysisResult.personalizedGuidance,
                 metadata: {
-                    processingTime: analysis.processingTime,
-                    cacheUsed: analysis.cacheUsed,
-                    timestamp: new Date()
+                    processingTime: analysisResult.processingTime,
+                    cacheUsed: analysisResult.cacheUsed,
+                    modelVersion: '2.0',
+                    apiVersion: '2.0'
                 }
             });
 
             await moodEntry.save();
+            
+            // Clear user context cache to refresh patterns
+            this.userContextCache.delete(userId);
+            
             return moodEntry;
 
         } catch (error) {
-            console.error('Error saving mood entry:', error);
-            // Don't throw error to avoid breaking the main flow
-            return null;
+            console.error('Save mood entry error:', error);
+            throw error;
         }
     }
 
@@ -1012,23 +948,26 @@ class MoodDetectionService {
                 offset = 0,
                 timeframe = '30d',
                 emotions = null,
-                includeInsights = false
+                includeInsights = false,
+                sortBy = 'createdAt',
+                sortOrder = 'desc'
             } = options;
 
             // Calculate date range
-            const now = new Date();
-            const timeframes = {
+            const timeframeDays = {
                 '1d': 1,
                 '7d': 7,
                 '30d': 30,
                 '90d': 90
             };
-            const days = timeframes[timeframe] || 30;
-            const startDate = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
+
+            const days = timeframeDays[timeframe] || 30;
+            const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
             // Build query
-            let query = {
+            const query = {
                 userId,
+                isActive: true,
                 createdAt: { $gte: startDate }
             };
 
@@ -1036,12 +975,16 @@ class MoodDetectionService {
                 query.primaryEmotion = { $in: emotions };
             }
 
+            // Build sort object
+            const sort = {};
+            sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
             // Execute query
             const entries = await MoodEntry.find(query)
-                .sort({ createdAt: -1 })
+                .sort(sort)
                 .skip(offset)
                 .limit(limit)
-                .select(includeInsights ? '' : '-insights -suggestions -userContext');
+                .select(includeInsights ? '' : '-insights -suggestions');
 
             const total = await MoodEntry.countDocuments(query);
 
@@ -1054,15 +997,12 @@ class MoodDetectionService {
                     hasMore: (offset + limit) < total
                 },
                 timeframe,
-                filters: {
-                    emotions,
-                    includeInsights
-                }
+                filters: { emotions, includeInsights }
             };
 
         } catch (error) {
-            console.error('Error getting mood history:', error);
-            throw new Error('Failed to retrieve mood history');
+            console.error('Get mood history error:', error);
+            throw error;
         }
     }
 
@@ -1071,296 +1011,194 @@ class MoodDetectionService {
      */
     async getMoodAnalytics(userId, timeframe = '30d') {
         try {
-            const patterns = await this.getUserEmotionPatterns(userId);
-            const history = await this.getMoodHistory(userId, { 
-                timeframe, 
-                limit: 1000 
-            });
+            const days = { '1d': 1, '7d': 7, '30d': 30, '90d': 90 }[timeframe] || 30;
+            const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-            const entries = history.entries;
-            
+            const entries = await MoodEntry.find({
+                userId,
+                isActive: true,
+                createdAt: { $gte: startDate }
+            }).sort({ createdAt: -1 });
+
             if (entries.length === 0) {
                 return {
                     totalEntries: 0,
-                    timeframe,
-                    message: 'No mood data available for this timeframe'
+                    emotionDistribution: {},
+                    dominantEmotion: null,
+                    averageConfidence: 0,
+                    moodStability: 0,
+                    intensityDistribution: {},
+                    recentTrend: 'stable',
+                    dailyMoodMap: {},
+                    insights: []
                 };
             }
 
-            // Calculate analytics
-            const emotionCounts = {};
-            const dailyMoods = {};
-            const confidenceScores = [];
-            const intensityDistribution = { low: 0, medium: 0, high: 0 };
-
+            // Calculate emotion distribution
+            const emotionDistribution = {};
             entries.forEach(entry => {
-                // Emotion distribution
-                const emotion = entry.primaryEmotion;
-                emotionCounts[emotion] = (emotionCounts[emotion] || 0) + 1;
+                emotionDistribution[entry.primaryEmotion] = 
+                    (emotionDistribution[entry.primaryEmotion] || 0) + 1;
+            });
 
-                // Daily mood tracking
-                const date = entry.createdAt.toISOString().split('T')[0];
-                if (!dailyMoods[date]) {
-                    dailyMoods[date] = [];
-                }
-                dailyMoods[date].push(emotion);
+            // Find dominant emotion
+            const dominantEmotion = Object.keys(emotionDistribution).reduce((a, b) => 
+                emotionDistribution[a] > emotionDistribution[b] ? a : b
+            );
 
-                // Confidence tracking
-                confidenceScores.push(entry.confidence);
+            // Calculate average confidence
+            const averageConfidence = entries.reduce((sum, entry) => 
+                sum + entry.confidence, 0) / entries.length;
 
-                // Intensity distribution
+            // Calculate mood stability (variance in emotions)
+            const uniqueEmotions = Object.keys(emotionDistribution).length;
+            const moodStability = Math.max(0, 1 - (uniqueEmotions / 9)); // 9 total emotions
+
+            // Calculate intensity distribution
+            const intensityDistribution = { low: 0, medium: 0, high: 0 };
+            entries.forEach(entry => {
                 intensityDistribution[entry.intensity]++;
             });
 
-            // Calculate trends
-            const sortedEmotions = Object.entries(emotionCounts)
-                .sort(([,a], [,b]) => b - a);
+            // Calculate recent trend
+            let recentTrend = 'stable';
+            if (entries.length >= 10) {
+                const recent = entries.slice(0, 5);
+                const older = entries.slice(5, 10);
+                
+                const recentPositive = recent.filter(e => 
+                    ['joyful', 'peaceful', 'grateful', 'hopeful'].includes(e.primaryEmotion)
+                ).length;
+                const olderPositive = older.filter(e => 
+                    ['joyful', 'peaceful', 'grateful', 'hopeful'].includes(e.primaryEmotion)
+                ).length;
+                
+                if (recentPositive > olderPositive) {
+                    recentTrend = 'improving';
+                } else if (recentPositive < olderPositive) {
+                    recentTrend = 'declining';
+                }
+            }
 
-            const averageConfidence = confidenceScores.reduce((a, b) => a + b, 0) / confidenceScores.length;
+            // Create daily mood map
+            const dailyMoodMap = {};
+            entries.forEach(entry => {
+                const date = entry.createdAt.toISOString().split('T')[0];
+                if (!dailyMoodMap[date]) {
+                    dailyMoodMap[date] = [];
+                }
+                dailyMoodMap[date].push(entry.primaryEmotion);
+            });
 
-            // Mood stability (how often the dominant emotion appears)
-            const dominantEmotion = sortedEmotions[0];
-            const stability = dominantEmotion ? (dominantEmotion[1] / entries.length) : 0;
+            // Generate insights
+            const insights = [];
+            
+            if (dominantEmotion) {
+                const percentage = Math.round((emotionDistribution[dominantEmotion] / entries.length) * 100);
+                insights.push({
+                    type: 'dominant_emotion',
+                    title: 'Most Common Emotion',
+                    message: `${dominantEmotion} appears in ${percentage}% of your entries`,
+                    emotion: dominantEmotion,
+                    percentage
+                });
+            }
+
+            if (moodStability > 0.7) {
+                insights.push({
+                    type: 'stability',
+                    title: 'Emotional Stability',
+                    message: 'Your emotions have been quite consistent lately'
+                });
+            }
+
+            if (recentTrend === 'improving') {
+                insights.push({
+                    type: 'trend',
+                    title: 'Positive Trend',
+                    message: 'Your emotional well-being has been improving recently'
+                });
+            }
 
             return {
                 totalEntries: entries.length,
                 timeframe,
-                emotionDistribution: emotionCounts,
-                dominantEmotion: dominantEmotion?.[0] || 'neutral',
+                emotionDistribution,
+                dominantEmotion,
                 averageConfidence: Math.round(averageConfidence * 100) / 100,
-                moodStability: Math.round(stability * 100) / 100,
+                moodStability: Math.round(moodStability * 100) / 100,
                 intensityDistribution,
-                recentTrend: patterns.recentTrend,
-                dailyMoodMap: dailyMoods,
-                insights: this.generateAnalyticsInsights(emotionCounts, patterns, averageConfidence)
+                recentTrend,
+                dailyMoodMap,
+                insights
             };
 
         } catch (error) {
-            console.error('Error getting mood analytics:', error);
-            throw new Error('Failed to generate mood analytics');
+            console.error('Get mood analytics error:', error);
+            throw error;
         }
     }
 
     /**
-     * Generate insights from analytics data
-     */
-    generateAnalyticsInsights(emotionCounts, patterns, averageConfidence) {
-        const insights = [];
-        const totalEntries = Object.values(emotionCounts).reduce((a, b) => a + b, 0);
-        
-        // Dominant emotion insight
-        const sortedEmotions = Object.entries(emotionCounts)
-            .sort(([,a], [,b]) => b - a);
-        
-        if (sortedEmotions.length > 0) {
-            const [dominantEmotion, count] = sortedEmotions[0];
-            const percentage = Math.round((count / totalEntries) * 100);
-            
-            insights.push({
-                type: 'dominant_emotion',
-                title: 'Most Common Emotion',
-                message: `${dominantEmotion} appears in ${percentage}% of your entries`,
-                emotion: dominantEmotion,
-                percentage
-            });
-        }
-
-        // Confidence insight
-        if (averageConfidence > 0.7) {
-            insights.push({
-                type: 'confidence',
-                title: 'Clear Emotional Expression',
-                message: 'Your emotions come through clearly in your expressions',
-                score: averageConfidence
-            });
-        } else if (averageConfidence < 0.5) {
-            insights.push({
-                type: 'confidence',
-                title: 'Mixed Emotions',
-                message: 'You often experience complex, mixed emotions',
-                score: averageConfidence
-            });
-        }
-
-        // Trend insight
-        if (patterns.recentTrend === 'improving') {
-            insights.push({
-                type: 'trend',
-                title: 'Positive Trend',
-                message: 'Your emotional well-being has been improving recently',
-                trend: 'improving'
-            });
-        } else if (patterns.recentTrend === 'declining') {
-            insights.push({
-                type: 'trend',
-                title: 'Needs Attention',
-                message: 'Consider focusing on self-care and spiritual practices',
-                trend: 'declining'
-            });
-        }
-
-        // Spiritual insight
-        const spiritualCount = emotionCounts.spiritual || 0;
-        if (spiritualCount > 0) {
-            const spiritualPercentage = Math.round((spiritualCount / totalEntries) * 100);
-            insights.push({
-                type: 'spiritual',
-                title: 'Spiritual Connection',
-                message: `${spiritualPercentage}% of your entries show spiritual awareness`,
-                percentage: spiritualPercentage
-            });
-        }
-
-        return insights;
-    }
-
-    /**
-     * Utility methods
+     * Helper methods
      */
 
-    validateInput(type, content, audioData, imageData) {
-        if (!['text', 'voice', 'image', 'combined'].includes(type)) {
+    validateInput(input) {
+        if (!input || !input.type) {
+            throw new Error('Input type is required');
+        }
+
+        const validTypes = ['text', 'voice', 'image', 'combined'];
+        if (!validTypes.includes(input.type)) {
             throw new Error('Invalid input type');
         }
 
-        if (type === 'text' && (!content || content.trim().length === 0)) {
+        if (input.type === 'text' && (!input.content || input.content.trim().length === 0)) {
             throw new Error('Text content is required for text analysis');
         }
 
-        if (type === 'voice' && !audioData && !content) {
-            throw new Error('Audio data or transcript is required for voice analysis');
-        }
-
-        if (type === 'image' && !imageData) {
-            throw new Error('Image data is required for image analysis');
-        }
-
-        if (type === 'combined' && !content && !audioData && !imageData) {
-            throw new Error('At least one input type is required for combined analysis');
-        }
-
-        if (content && content.length > 5000) {
+        if (input.content && input.content.length > 5000) {
             throw new Error('Text content too long. Maximum 5000 characters allowed.');
         }
     }
 
-    generateCacheKey(userId, input) {
-        const contentHash = input.content ? 
-            require('crypto').createHash('md5').update(input.content).digest('hex').substring(0, 8) : 
-            'no-content';
-        return `${userId}-${input.type}-${contentHash}`;
+    calculateIntensity(analysisResult) {
+        const confidence = analysisResult.confidence;
+        if (confidence >= 0.8) return 'high';
+        if (confidence >= 0.6) return 'medium';
+        return 'low';
     }
 
-    limitCacheSize() {
-        if (this.analysisCache.size > 500) {
-            const firstKey = this.analysisCache.keys().next().value;
-            this.analysisCache.delete(firstKey);
-        }
+    generateCacheKey(input, userId) {
+        const content = input.content || '';
+        const type = input.type;
+        return `${userId}-${type}-${content.substring(0, 50)}`;
     }
 
-    updateMetrics(startTime) {
-        const processingTime = Date.now() - startTime;
+    generateTextCacheKey(text) {
+        return `text-${text.substring(0, 100)}`;
+    }
+
+    updateMetrics(processingTime) {
         this.metrics.averageProcessingTime = 
             (this.metrics.averageProcessingTime + processingTime) / 2;
-    }
-
-    getFallbackAnalysis(type) {
-        return {
-            primaryEmotion: 'neutral',
-            confidence: 0.5,
-            intensity: 'medium',
-            emotions: { neutral: 1.0 },
-            analysisType: type,
-            fallback: true,
-            message: 'Analysis completed with basic detection'
-        };
-    }
-
-    getErrorMessage(error) {
-        if (error.message.includes('too long')) {
-            return error.message;
-        } else if (error.message.includes('required')) {
-            return error.message;
-        } else if (error.message.includes('Invalid')) {
-            return error.message;
-        } else {
-            return 'Mood analysis temporarily unavailable. Please try again.';
-        }
-    }
-
-    async logAnalysis(userId, input, analysis) {
-        try {
-            await ApiLog.create({
-                userId,
-                endpoint: '/api/mood/analyze',
-                method: 'POST',
-                status: 200,
-                details: {
-                    inputType: input.type,
-                    primaryEmotion: analysis.primaryEmotion,
-                    confidence: analysis.confidence,
-                    processingTime: analysis.processingTime
-                }
-            });
-        } catch (error) {
-            console.error('Error logging analysis:', error);
-        }
-    }
-
-    async logError(userId, error, input) {
-        try {
-            await ApiLog.create({
-                userId,
-                endpoint: '/api/mood/analyze',
-                method: 'POST',
-                status: 500,
-                details: {
-                    error: error.message,
-                    inputType: input?.type,
-                    stack: error.stack
-                }
-            });
-        } catch (logError) {
-            console.error('Error logging error:', logError);
-        }
     }
 
     setupCleanupIntervals() {
         // Clean up caches every 30 minutes
         setInterval(() => {
-            this.cleanupCaches();
-        }, 30 * 60 * 1000);
-
-        // Reset metrics every hour
-        setInterval(() => {
-            this.resetMetrics();
-        }, 60 * 60 * 1000);
-    }
-
-    cleanupCaches() {
-        // Clean analysis cache
-        if (this.analysisCache.size > 300) {
-            const entries = Array.from(this.analysisCache.entries());
-            const toDelete = entries.slice(0, entries.length - 300);
-            toDelete.forEach(([key]) => this.analysisCache.delete(key));
-        }
-
-        // Clean user pattern cache
-        const now = Date.now();
-        for (const [userId, cached] of this.userPatternCache.entries()) {
-            if (now - cached.timestamp > 600000) { // 10 minutes
-                this.userPatternCache.delete(userId);
+            if (this.analysisCache.size > 200) {
+                const entries = Array.from(this.analysisCache.entries());
+                const toDelete = entries.slice(0, entries.length - 150);
+                toDelete.forEach(([key]) => this.analysisCache.delete(key));
             }
-        }
-    }
 
-    resetMetrics() {
-        this.metrics = {
-            totalAnalyses: 0,
-            averageProcessingTime: 0,
-            accuracyScore: 0,
-            cacheHitRate: 0
-        };
+            if (this.userContextCache.size > 100) {
+                const entries = Array.from(this.userContextCache.entries());
+                const toDelete = entries.slice(0, entries.length - 80);
+                toDelete.forEach(([key]) => this.userContextCache.delete(key));
+            }
+        }, 30 * 60 * 1000);
     }
 
     getHealthMetrics() {
@@ -1369,16 +1207,15 @@ class MoodDetectionService {
             metrics: this.metrics,
             cacheStats: {
                 analysisCacheSize: this.analysisCache.size,
-                userPatternCacheSize: this.userPatternCache.size
+                userContextCacheSize: this.userContextCache.size
             },
-            emotionCategories: Object.keys(this.emotionCategories),
             timestamp: new Date().toISOString()
         };
     }
 
     cleanup() {
         this.analysisCache.clear();
-        this.userPatternCache.clear();
+        this.userContextCache.clear();
     }
 }
 

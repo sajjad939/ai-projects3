@@ -1,33 +1,23 @@
-/**
- * Advanced Mood Detection Component for Mirror of Heart
- * Provides comprehensive mood analysis interface with multiple input types
- */
 class MoodDetector {
     constructor() {
+        this.isAnalyzing = false;
         this.currentAnalysis = null;
         this.analysisHistory = [];
-        this.isAnalyzing = false;
-        this.supportedEmotions = [];
-        this.userPreferences = {};
-        
-        // Audio recording
+        this.voiceRecognition = null;
         this.mediaRecorder = null;
         this.audioChunks = [];
-        this.isRecording = false;
-        
-        // Camera capture
-        this.videoStream = null;
-        this.isCapturing = false;
+        this.currentImageData = null;
+        this.retryAttempts = 0;
+        this.maxRetryAttempts = 3;
         
         this.init();
     }
 
-    async init() {
+    init() {
         this.createMoodInterface();
         this.bindEvents();
-        await this.loadSupportedEmotions();
-        await this.loadUserPreferences();
-        this.setupKeyboardShortcuts();
+        this.setupVoiceRecognition();
+        this.loadAnalyticsData();
         
         // Auto-focus text input
         setTimeout(() => {
@@ -46,14 +36,14 @@ class MoodDetector {
                 <div class="mood-title">
                     <h2>Mood Detection</h2>
                     <div class="mood-status">
-                        <span class="status-indicator" id="mood-status"></span>
+                        <span class="status-indicator ready" id="mood-status-indicator"></span>
                         <span id="mood-status-text">Ready to analyze</span>
                     </div>
                 </div>
                 <div class="mood-controls">
                     <button id="mood-history-btn" class="btn-secondary" title="View History">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            <path d="M3 3h18v18H3zM9 9h6M9 15h6"/>
                         </svg>
                         History
                     </button>
@@ -97,7 +87,7 @@ class MoodDetector {
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                     </svg>
-                    Multi-Modal
+                    Combined
                 </button>
             </div>
 
@@ -112,61 +102,65 @@ class MoodDetector {
                             maxlength="5000"
                         ></textarea>
                         <div class="input-footer">
-                            <div class="character-count">
-                                <span id="text-char-count">0</span>/5000
-                            </div>
                             <div class="input-options">
                                 <label>
-                                    <input type="checkbox" id="include-context" checked>
+                                    <input type="checkbox" id="include-spiritual-context"> 
                                     Include spiritual context
                                 </label>
                             </div>
+                            <div class="character-count">
+                                <span id="text-char-count">0</span>/5000
+                            </div>
                         </div>
+                        <button id="analyze-text-btn" class="analyze-btn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 12l2 2 4-4"/>
+                                <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"/>
+                                <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3"/>
+                                <path d="M12 3c0 1-1 3-3 3s-3-2-3-3 1-3 3-3 3 2 3 3"/>
+                                <path d="M12 21c0-1 1-3 3-3s3 2 3 3-1 3-3 3-3-2-3-3"/>
+                            </svg>
+                            Analyze Mood
+                        </button>
                     </div>
-                    <button id="analyze-text-btn" class="btn-primary analyze-btn">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 12l2 2 4-4"/>
-                            <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"/>
-                            <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3"/>
-                        </svg>
-                        Analyze Mood
-                    </button>
                 </div>
 
                 <!-- Voice Input Tab -->
                 <div class="tab-content" id="voice-tab">
                     <div class="voice-input-section">
                         <div class="voice-controls">
-                            <button id="start-recording-btn" class="btn-record">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <button id="start-voice-recording" class="btn-record">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
                                     <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
                                     <path d="M12 19v4M8 23h8"/>
                                 </svg>
                                 Start Recording
                             </button>
-                            <button id="stop-recording-btn" class="btn-stop" disabled>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <button id="stop-voice-recording" class="btn-stop" disabled>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <rect x="6" y="6" width="12" height="12"/>
                                 </svg>
                                 Stop Recording
                             </button>
                         </div>
                         <div class="recording-status" id="recording-status">
-                            <div class="recording-indicator"></div>
-                            <span>Click "Start Recording" to begin</span>
+                            <span class="recording-indicator" id="recording-indicator"></span>
+                            <span id="recording-text">Click "Start Recording" to begin</span>
                         </div>
-                        <div class="voice-transcript" id="voice-transcript">
-                            <p>Transcript will appear here...</p>
-                        </div>
-                        <audio id="recorded-audio" controls style="display: none;"></audio>
+                        <textarea 
+                            id="voice-transcript" 
+                            class="voice-transcript" 
+                            placeholder="Voice transcript will appear here..."
+                            readonly
+                        ></textarea>
+                        <button id="analyze-voice-btn" class="analyze-btn" disabled>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 12l2 2 4-4"/>
+                            </svg>
+                            Analyze Voice
+                        </button>
                     </div>
-                    <button id="analyze-voice-btn" class="btn-primary analyze-btn" disabled>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 12l2 2 4-4"/>
-                        </svg>
-                        Analyze Voice
-                    </button>
                 </div>
 
                 <!-- Image Input Tab -->
@@ -184,8 +178,9 @@ class MoodDetector {
                             </div>
                             <input type="file" id="image-file-input" accept="image/*" style="display: none;">
                         </div>
+                        
                         <div class="camera-section">
-                            <button id="use-camera-btn" class="btn-secondary">
+                            <button id="start-camera-btn" class="btn-secondary">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                                     <circle cx="12" cy="13" r="4"/>
@@ -193,85 +188,73 @@ class MoodDetector {
                                 Use Camera
                             </button>
                             <video id="camera-preview" autoplay playsinline style="display: none;"></video>
-                            <canvas id="camera-canvas" style="display: none;"></canvas>
                             <button id="capture-photo-btn" class="btn-primary" style="display: none;">Capture Photo</button>
                         </div>
+
                         <div class="image-preview" id="image-preview" style="display: none;">
-                            <img id="preview-image" alt="Selected image">
-                            <button id="remove-image-btn" class="btn-remove">×</button>
+                            <img id="preview-image" alt="Preview">
+                            <button class="btn-remove" id="remove-image-btn">×</button>
                         </div>
+
+                        <button id="analyze-image-btn" class="analyze-btn" disabled>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 12l2 2 4-4"/>
+                            </svg>
+                            Analyze Image
+                        </button>
                     </div>
-                    <button id="analyze-image-btn" class="btn-primary analyze-btn" disabled>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 12l2 2 4-4"/>
-                        </svg>
-                        Analyze Image
-                    </button>
                 </div>
 
                 <!-- Combined Input Tab -->
                 <div class="tab-content" id="combined-tab">
                     <div class="combined-input-section">
                         <div class="combined-text">
-                            <label>Text Input:</label>
+                            <label for="combined-text-input">Text Input (Optional)</label>
                             <textarea 
                                 id="combined-text-input" 
-                                placeholder="Describe your current state..."
+                                placeholder="Add text to complement your voice or image..."
                                 rows="3"
-                                maxlength="2000"
+                                maxlength="5000"
                             ></textarea>
                         </div>
+                        
                         <div class="combined-options">
                             <label>
-                                <input type="checkbox" id="combined-include-voice">
+                                <input type="checkbox" id="combined-include-voice"> 
                                 Include voice recording
                             </label>
                             <label>
-                                <input type="checkbox" id="combined-include-image">
-                                Include image/photo
+                                <input type="checkbox" id="combined-include-image"> 
+                                Include image
+                            </label>
+                            <label>
+                                <input type="checkbox" id="combined-spiritual-context"> 
+                                Include spiritual context
                             </label>
                         </div>
-                        <div class="combined-voice" id="combined-voice-section" style="display: none;">
-                            <button id="combined-record-btn" class="btn-secondary">Record Voice</button>
-                            <div id="combined-voice-status"></div>
-                        </div>
-                        <div class="combined-image" id="combined-image-section" style="display: none;">
-                            <button id="combined-image-btn" class="btn-secondary">Add Image</button>
-                            <div id="combined-image-preview"></div>
-                        </div>
+
+                        <button id="analyze-combined-btn" class="analyze-btn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 12l2 2 4-4"/>
+                            </svg>
+                            Analyze Combined Input
+                        </button>
                     </div>
-                    <button id="analyze-combined-btn" class="btn-primary analyze-btn">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 12l2 2 4-4"/>
-                        </svg>
-                        Analyze All Inputs
-                    </button>
                 </div>
             </div>
 
+            <!-- Results Section -->
             <div class="mood-results" id="mood-results" style="display: none;">
                 <div class="results-header">
                     <h3>Analysis Results</h3>
                     <div class="results-actions">
-                        <button id="save-analysis-btn" class="btn-secondary">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                                <polyline points="17,21 17,13 7,13 7,21"/>
-                                <polyline points="7,3 7,8 15,8"/>
-                            </svg>
-                            Save
-                        </button>
-                        <button id="share-analysis-btn" class="btn-secondary">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
-                                <polyline points="16,6 12,2 8,6"/>
-                                <line x1="12" y1="2" x2="12" y2="15"/>
-                            </svg>
-                            Share
-                        </button>
+                        <button id="save-analysis-btn" class="btn-secondary">Save</button>
+                        <button id="share-analysis-btn" class="btn-secondary">Share</button>
+                        <button id="clear-results-btn" class="btn-icon">×</button>
                     </div>
                 </div>
-                
+
+                <!-- Primary Emotion Display -->
                 <div class="primary-emotion" id="primary-emotion">
                     <div class="emotion-display">
                         <div class="emotion-icon" id="emotion-icon">😊</div>
@@ -283,50 +266,56 @@ class MoodDetector {
                     </div>
                 </div>
 
+                <!-- Emotion Breakdown -->
                 <div class="emotion-breakdown" id="emotion-breakdown">
                     <h4>Emotion Breakdown</h4>
-                    <div class="emotion-bars" id="emotion-bars">
-                        <!-- Emotion bars will be populated here -->
-                    </div>
+                    <div id="emotion-bars"></div>
                 </div>
 
+                <!-- Spiritual Context -->
                 <div class="spiritual-context" id="spiritual-context" style="display: none;">
                     <h4>Spiritual Context</h4>
-                    <div class="spiritual-info" id="spiritual-info">
-                        <!-- Spiritual context will be populated here -->
+                    <div class="spiritual-score">
+                        <span class="spiritual-label">Spiritual Content:</span>
+                        <span class="spiritual-value" id="spiritual-score-value">Low</span>
                     </div>
+                    <div class="spiritual-tradition">
+                        <span class="spiritual-label">Detected Tradition:</span>
+                        <span class="spiritual-value" id="spiritual-tradition-value">Universal</span>
+                    </div>
+                    <div class="spiritual-tags" id="spiritual-tags"></div>
                 </div>
 
+                <!-- Insights Section -->
                 <div class="insights-section" id="insights-section">
                     <h4>Insights</h4>
-                    <div class="insights-list" id="insights-list">
-                        <!-- Insights will be populated here -->
-                    </div>
+                    <div id="insights-container"></div>
                 </div>
 
+                <!-- Suggestions Section -->
                 <div class="suggestions-section" id="suggestions-section">
                     <h4>Personalized Suggestions</h4>
-                    <div class="suggestions-grid" id="suggestions-grid">
-                        <!-- Suggestions will be populated here -->
-                    </div>
+                    <div class="suggestions-grid" id="suggestions-grid"></div>
                 </div>
 
+                <!-- Analysis Metadata -->
                 <div class="analysis-metadata" id="analysis-metadata">
                     <div class="metadata-item">
-                        <span class="metadata-label">Analysis Type:</span>
-                        <span class="metadata-value" id="analysis-type">Text</span>
+                        <div class="metadata-label">Processing Time</div>
+                        <div class="metadata-value" id="processing-time">--</div>
                     </div>
                     <div class="metadata-item">
-                        <span class="metadata-label">Processing Time:</span>
-                        <span class="metadata-value" id="processing-time">1.2s</span>
+                        <div class="metadata-label">Analysis Type</div>
+                        <div class="metadata-value" id="analysis-type">--</div>
                     </div>
                     <div class="metadata-item">
-                        <span class="metadata-label">Timestamp:</span>
-                        <span class="metadata-value" id="analysis-timestamp">Just now</span>
+                        <div class="metadata-label">Timestamp</div>
+                        <div class="metadata-value" id="analysis-timestamp">--</div>
                     </div>
                 </div>
             </div>
 
+            <!-- History Panel -->
             <div class="mood-history-panel" id="mood-history-panel">
                 <div class="panel-header">
                     <h3>Mood History</h3>
@@ -335,12 +324,20 @@ class MoodDetector {
                 <div class="history-filters">
                     <select id="history-timeframe">
                         <option value="7d">Last 7 days</option>
-                        <option value="30d">Last 30 days</option>
+                        <option value="30d" selected>Last 30 days</option>
                         <option value="90d">Last 90 days</option>
                     </select>
                     <select id="history-emotion-filter">
                         <option value="">All emotions</option>
-                        <!-- Options will be populated dynamically -->
+                        <option value="peaceful">Peaceful</option>
+                        <option value="grateful">Grateful</option>
+                        <option value="anxious">Anxious</option>
+                        <option value="sad">Sad</option>
+                        <option value="joyful">Joyful</option>
+                        <option value="spiritual">Spiritual</option>
+                        <option value="angry">Angry</option>
+                        <option value="hopeful">Hopeful</option>
+                        <option value="neutral">Neutral</option>
                     </select>
                 </div>
                 <div class="history-content" id="history-content">
@@ -348,8 +345,9 @@ class MoodDetector {
                 </div>
             </div>
 
+            <!-- Analytics Panel -->
             <div class="mood-analytics-panel" id="mood-analytics-panel">
-                <div class="panel-header">
+                <div class="analytics-header">
                     <h3>Mood Analytics</h3>
                     <button id="close-analytics-btn" class="btn-icon">×</button>
                 </div>
@@ -358,9 +356,10 @@ class MoodDetector {
                 </div>
             </div>
 
-            <div class="loading-overlay" id="mood-loading" style="display: none;">
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="mood-loading-overlay" style="display: none;">
                 <div class="loading-spinner"></div>
-                <p>Analyzing your mood...</p>
+                <p id="loading-text">Analyzing your mood...</p>
             </div>
         `;
 
@@ -373,9 +372,9 @@ class MoodDetector {
             
             // Insert into the second column
             const columns = document.querySelectorAll('.chatgpt-column');
-            const targetColumn = columns[1] || columns[0];
-            if (targetColumn) {
-                targetColumn.appendChild(moodBlock);
+            const secondColumn = columns[1] || columns[0];
+            if (secondColumn) {
+                secondColumn.appendChild(moodBlock);
             } else {
                 document.body.appendChild(moodBlock);
             }
@@ -395,8 +394,11 @@ class MoodDetector {
 
         // Text input events
         const textInput = document.getElementById('mood-text-input');
+        const textCharCount = document.getElementById('text-char-count');
+        
         textInput.addEventListener('input', () => {
-            this.updateCharacterCount('text');
+            textCharCount.textContent = textInput.value.length;
+            this.updateCharacterCount(textInput, textCharCount);
         });
 
         // Analyze buttons
@@ -417,12 +419,12 @@ class MoodDetector {
         });
 
         // Voice recording
-        document.getElementById('start-recording-btn').addEventListener('click', () => {
-            this.startRecording();
+        document.getElementById('start-voice-recording').addEventListener('click', () => {
+            this.startVoiceRecording();
         });
 
-        document.getElementById('stop-recording-btn').addEventListener('click', () => {
-            this.stopRecording();
+        document.getElementById('stop-voice-recording').addEventListener('click', () => {
+            this.stopVoiceRecording();
         });
 
         // Image upload
@@ -458,7 +460,7 @@ class MoodDetector {
         });
 
         // Camera
-        document.getElementById('use-camera-btn').addEventListener('click', () => {
+        document.getElementById('start-camera-btn').addEventListener('click', () => {
             this.startCamera();
         });
 
@@ -466,9 +468,21 @@ class MoodDetector {
             this.capturePhoto();
         });
 
-        // Remove image
         document.getElementById('remove-image-btn').addEventListener('click', () => {
             this.removeImage();
+        });
+
+        // Results actions
+        document.getElementById('save-analysis-btn').addEventListener('click', () => {
+            this.saveAnalysis();
+        });
+
+        document.getElementById('share-analysis-btn').addEventListener('click', () => {
+            this.shareAnalysis();
+        });
+
+        document.getElementById('clear-results-btn').addEventListener('click', () => {
+            this.clearResults();
         });
 
         // History and analytics
@@ -497,48 +511,45 @@ class MoodDetector {
             this.loadHistory();
         });
 
-        // Combined input options
-        document.getElementById('combined-include-voice').addEventListener('change', (e) => {
-            document.getElementById('combined-voice-section').style.display = 
-                e.target.checked ? 'block' : 'none';
-        });
-
-        document.getElementById('combined-include-image').addEventListener('change', (e) => {
-            document.getElementById('combined-image-section').style.display = 
-                e.target.checked ? 'block' : 'none';
-        });
-
-        // Results actions
-        document.getElementById('save-analysis-btn').addEventListener('click', () => {
-            this.saveAnalysis();
-        });
-
-        document.getElementById('share-analysis-btn').addEventListener('click', () => {
-            this.shareAnalysis();
-        });
-    }
-
-    setupKeyboardShortcuts() {
+        // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
-            // Ctrl/Cmd + Enter to analyze current tab
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                 e.preventDefault();
                 const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
                 this.analyzeCurrentTab(activeTab);
             }
-            
-            // Ctrl/Cmd + H for history
-            if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
-                e.preventDefault();
-                this.toggleHistoryPanel();
-            }
-            
-            // Ctrl/Cmd + A for analytics
-            if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
-                e.preventDefault();
-                this.toggleAnalyticsPanel();
-            }
         });
+    }
+
+    setupVoiceRecognition() {
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            this.voiceRecognition = new SpeechRecognition();
+            
+            this.voiceRecognition.continuous = false;
+            this.voiceRecognition.interimResults = false;
+            this.voiceRecognition.lang = 'en-US';
+
+            this.voiceRecognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById('voice-transcript').value = transcript;
+                document.getElementById('analyze-voice-btn').disabled = false;
+            };
+
+            this.voiceRecognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                this.showError('Speech recognition error: ' + event.error);
+                this.resetVoiceRecording();
+            };
+
+            this.voiceRecognition.onend = () => {
+                this.resetVoiceRecording();
+            };
+        } else {
+            // Disable voice features if not supported
+            document.querySelector('[data-tab="voice"]').disabled = true;
+            document.querySelector('[data-tab="voice"]').title = 'Voice recognition not supported in this browser';
+        }
     }
 
     switchTab(tabName) {
@@ -564,148 +575,112 @@ class MoodDetector {
         }, 100);
     }
 
-    updateCharacterCount(inputType) {
-        const input = document.getElementById(`${inputType === 'text' ? 'mood-text-input' : 'combined-text-input'}`);
-        const counter = document.getElementById(`${inputType === 'text' ? 'text-char-count' : 'combined-char-count'}`);
-        
-        if (input && counter) {
-            const count = input.value.length;
-            counter.textContent = count;
-            
-            // Update color based on usage
-            if (count > 4500) {
-                counter.style.color = '#ef4444';
-            } else if (count > 3500) {
-                counter.style.color = '#f59e0b';
-            } else {
-                counter.style.color = '#6b7280';
-            }
-        }
-    }
-
-    async analyzeCurrentTab(tabName) {
-        switch (tabName) {
-            case 'text':
-                await this.analyzeText();
-                break;
-            case 'voice':
-                await this.analyzeVoice();
-                break;
-            case 'image':
-                await this.analyzeImage();
-                break;
-            case 'combined':
-                await this.analyzeCombined();
-                break;
-        }
-    }
-
     async analyzeText() {
         const textInput = document.getElementById('mood-text-input');
-        const includeContext = document.getElementById('include-context').checked;
-        
         const text = textInput.value.trim();
+        
         if (!text) {
             this.showError('Please enter some text to analyze.');
             return;
         }
 
-        const input = {
+        const includeSpiritual = document.getElementById('include-spiritual-context').checked;
+
+        await this.performAnalysis({
             type: 'text',
             content: text,
-            context: includeContext ? this.getContextInfo() : {}
-        };
-
-        const options = {
-            includeInsights: true,
-            includeSuggestions: true,
-            saveToHistory: true
-        };
-
-        await this.performAnalysis(input, options);
+            context: {
+                includeSpiritual,
+                timeOfDay: new Date().getHours()
+            }
+        });
     }
 
     async analyzeVoice() {
-        if (!this.audioChunks.length) {
-            this.showError('Please record some audio first.');
+        const transcript = document.getElementById('voice-transcript').value.trim();
+        
+        if (!transcript) {
+            this.showError('Please record some voice input first.');
             return;
         }
 
-        const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
-        const audioData = await this.blobToBase64(audioBlob);
-        const transcript = document.getElementById('voice-transcript').textContent;
-
-        const input = {
+        await this.performAnalysis({
             type: 'voice',
-            audioData,
-            content: transcript !== 'Transcript will appear here...' ? transcript : '',
-            context: this.getContextInfo()
-        };
-
-        const options = {
-            includeInsights: true,
-            includeSuggestions: true,
-            saveToHistory: true
-        };
-
-        await this.performAnalysis(input, options);
+            content: transcript,
+            // audioData would be included here if we had actual audio recording
+            context: {
+                hasAudioData: false, // Would be true with actual audio
+                timeOfDay: new Date().getHours()
+            }
+        });
     }
 
     async analyzeImage() {
-        const previewImage = document.getElementById('preview-image');
-        if (!previewImage.src) {
-            this.showError('Please select or capture an image first.');
+        if (!this.currentImageData) {
+            this.showError('Please upload or capture an image first.');
             return;
         }
 
-        const imageData = previewImage.src;
-
-        const input = {
+        await this.performAnalysis({
             type: 'image',
-            imageData,
-            context: this.getContextInfo()
-        };
-
-        const options = {
-            includeInsights: true,
-            includeSuggestions: true,
-            saveToHistory: true
-        };
-
-        await this.performAnalysis(input, options);
+            imageData: this.currentImageData,
+            context: {
+                timeOfDay: new Date().getHours()
+            }
+        });
     }
 
     async analyzeCombined() {
         const textInput = document.getElementById('combined-text-input');
+        const text = textInput.value.trim();
         const includeVoice = document.getElementById('combined-include-voice').checked;
         const includeImage = document.getElementById('combined-include-image').checked;
+        const includeSpiritual = document.getElementById('combined-spiritual-context').checked;
 
-        const text = textInput.value.trim();
-        
         if (!text && !includeVoice && !includeImage) {
-            this.showError('Please provide at least one input type.');
+            this.showError('Please provide at least one input type for combined analysis.');
             return;
         }
 
-        const input = {
+        const analysisInput = {
             type: 'combined',
             content: text || null,
-            audioData: includeVoice && this.audioChunks.length ? 
-                await this.blobToBase64(new Blob(this.audioChunks, { type: 'audio/wav' })) : null,
-            imageData: includeImage ? document.getElementById('preview-image')?.src : null,
-            context: this.getContextInfo()
+            context: {
+                includeSpiritual,
+                timeOfDay: new Date().getHours()
+            }
         };
 
-        const options = {
-            includeInsights: true,
-            includeSuggestions: true,
-            saveToHistory: true
-        };
+        if (includeVoice) {
+            // In a real implementation, we would include voice data here
+            analysisInput.audioData = null; // Placeholder
+        }
 
-        await this.performAnalysis(input, options);
+        if (includeImage && this.currentImageData) {
+            analysisInput.imageData = this.currentImageData;
+        }
+
+        await this.performAnalysis(analysisInput);
     }
 
-    async performAnalysis(input, options) {
+    analyzeCurrentTab(tabName) {
+        switch (tabName) {
+            case 'text':
+                this.analyzeText();
+                break;
+            case 'voice':
+                this.analyzeVoice();
+                break;
+            case 'image':
+                this.analyzeImage();
+                break;
+            case 'combined':
+                this.analyzeCombined();
+                break;
+        }
+    }
+
+    async performAnalysis(input) {
         if (this.isAnalyzing) return;
 
         this.isAnalyzing = true;
@@ -715,18 +690,24 @@ class MoodDetector {
         try {
             const response = await this.makeApiRequest('/api/mood/analyze', {
                 method: 'POST',
-                body: JSON.stringify({ input, options })
+                body: JSON.stringify({
+                    input,
+                    options: {
+                        includeInsights: true,
+                        includeSuggestions: true,
+                        saveToHistory: true
+                    }
+                })
             });
 
             if (response.success) {
                 this.currentAnalysis = response.data;
                 this.displayResults(response.data);
-                this.updateStatus('complete', 'Analysis complete');
-                
-                // Add to history
                 this.analysisHistory.unshift(response.data);
-                if (this.analysisHistory.length > 50) {
-                    this.analysisHistory = this.analysisHistory.slice(0, 50);
+                
+                // Keep only last 10 analyses in memory
+                if (this.analysisHistory.length > 10) {
+                    this.analysisHistory = this.analysisHistory.slice(0, 10);
                 }
             } else {
                 throw new Error(response.error || 'Analysis failed');
@@ -734,55 +715,54 @@ class MoodDetector {
 
         } catch (error) {
             console.error('Mood analysis error:', error);
-            this.showError(error.message);
-            this.updateStatus('error', 'Analysis failed');
+            this.handleAnalysisError(error);
         } finally {
             this.isAnalyzing = false;
             this.showLoading(false);
+            this.updateStatus('ready', 'Ready to analyze');
         }
     }
 
-    displayResults(analysis) {
+    displayResults(analysisData) {
         const resultsContainer = document.getElementById('mood-results');
         resultsContainer.style.display = 'block';
 
         // Primary emotion
-        this.displayPrimaryEmotion(analysis);
-        
+        this.displayPrimaryEmotion(analysisData);
+
         // Emotion breakdown
-        this.displayEmotionBreakdown(analysis.emotions);
-        
+        this.displayEmotionBreakdown(analysisData.emotions);
+
         // Spiritual context
-        if (analysis.spiritualContext?.isSpiritual) {
-            this.displaySpiritualContext(analysis.spiritualContext);
+        if (analysisData.spiritualContext && analysisData.spiritualContext.isSpiritual) {
+            this.displaySpiritualContext(analysisData.spiritualContext);
+        } else {
+            document.getElementById('spiritual-context').style.display = 'none';
         }
-        
+
         // Insights
-        if (analysis.insights?.length > 0) {
-            this.displayInsights(analysis.insights);
-        }
-        
+        this.displayInsights(analysisData.insights || []);
+
         // Suggestions
-        if (analysis.suggestions?.length > 0) {
-            this.displaySuggestions(analysis.suggestions);
-        }
-        
+        this.displaySuggestions(analysisData.suggestions || []);
+
         // Metadata
-        this.displayMetadata(analysis);
+        this.displayMetadata(analysisData);
 
         // Scroll to results
         resultsContainer.scrollIntoView({ behavior: 'smooth' });
     }
 
-    displayPrimaryEmotion(analysis) {
+    displayPrimaryEmotion(analysisData) {
         const emotionIcon = document.getElementById('emotion-icon');
         const emotionName = document.getElementById('emotion-name');
         const emotionConfidence = document.getElementById('emotion-confidence');
         const emotionIntensity = document.getElementById('emotion-intensity');
+        const primaryEmotion = document.getElementById('primary-emotion');
 
         // Emotion icons mapping
         const emotionIcons = {
-            peaceful: '🕊️',
+            peaceful: '😌',
             grateful: '🙏',
             anxious: '😰',
             sad: '😢',
@@ -793,16 +773,15 @@ class MoodDetector {
             neutral: '😐'
         };
 
-        emotionIcon.textContent = emotionIcons[analysis.primaryEmotion] || '😐';
-        emotionName.textContent = analysis.primaryEmotion.charAt(0).toUpperCase() + 
-                                 analysis.primaryEmotion.slice(1);
-        emotionConfidence.textContent = `${Math.round(analysis.confidence * 100)}% confidence`;
-        emotionIntensity.textContent = `${analysis.intensity.charAt(0).toUpperCase() + 
-                                       analysis.intensity.slice(1)} intensity`;
+        emotionIcon.textContent = emotionIcons[analysisData.primaryEmotion] || '😐';
+        emotionName.textContent = analysisData.primaryEmotion.charAt(0).toUpperCase() + 
+                                 analysisData.primaryEmotion.slice(1);
+        emotionConfidence.textContent = `${Math.round(analysisData.confidence * 100)}% confidence`;
+        emotionIntensity.textContent = `${analysisData.intensity.charAt(0).toUpperCase() + 
+                                       analysisData.intensity.slice(1)} intensity`;
 
-        // Apply emotion color
-        const primaryEmotionEl = document.getElementById('primary-emotion');
-        primaryEmotionEl.className = `primary-emotion emotion-${analysis.primaryEmotion}`;
+        // Add emotion-specific styling
+        primaryEmotion.className = `primary-emotion emotion-${analysisData.primaryEmotion}`;
     }
 
     displayEmotionBreakdown(emotions) {
@@ -812,72 +791,81 @@ class MoodDetector {
         // Sort emotions by score
         const sortedEmotions = Object.entries(emotions)
             .sort(([,a], [,b]) => b - a)
-            .slice(0, 5); // Show top 5
+            .slice(0, 6); // Show top 6 emotions
 
         sortedEmotions.forEach(([emotion, score]) => {
             const barContainer = document.createElement('div');
             barContainer.className = 'emotion-bar-container';
-            
+
+            const maxScore = Math.max(...Object.values(emotions));
+            const percentage = (score / maxScore) * 100;
+
             barContainer.innerHTML = `
                 <div class="emotion-bar-label">${emotion}</div>
                 <div class="emotion-bar">
-                    <div class="emotion-bar-fill emotion-${emotion}" 
-                         style="width: ${score * 100}%">
+                    <div class="emotion-bar-fill emotion-${emotion}" style="width: ${percentage}%">
                         <span class="emotion-bar-score">${Math.round(score * 100)}%</span>
                     </div>
                 </div>
             `;
-            
+
             emotionBars.appendChild(barContainer);
         });
     }
 
     displaySpiritualContext(spiritualContext) {
-        const spiritualSection = document.getElementById('spiritual-context');
-        const spiritualInfo = document.getElementById('spiritual-info');
-        
-        spiritualSection.style.display = 'block';
-        
-        spiritualInfo.innerHTML = `
-            <div class="spiritual-score">
-                <span class="spiritual-label">Spiritual Awareness:</span>
-                <span class="spiritual-value">${Math.round(spiritualContext.score * 100)}%</span>
-            </div>
-            ${spiritualContext.suggestedTradition ? `
-                <div class="spiritual-tradition">
-                    <span class="spiritual-label">Detected Tradition:</span>
-                    <span class="spiritual-value">${spiritualContext.suggestedTradition}</span>
-                </div>
-            ` : ''}
-            ${spiritualContext.detectedTerms?.spiritual?.length > 0 ? `
-                <div class="spiritual-terms">
-                    <span class="spiritual-label">Spiritual Terms:</span>
-                    <div class="spiritual-tags">
-                        ${spiritualContext.detectedTerms.spiritual.map(term => 
-                            `<span class="spiritual-tag">${term}</span>`
-                        ).join('')}
-                    </div>
-                </div>
-            ` : ''}
-        `;
+        const spiritualContextDiv = document.getElementById('spiritual-context');
+        const spiritualScoreValue = document.getElementById('spiritual-score-value');
+        const spiritualTraditionValue = document.getElementById('spiritual-tradition-value');
+        const spiritualTags = document.getElementById('spiritual-tags');
+
+        spiritualContextDiv.style.display = 'block';
+
+        // Spiritual score
+        const scoreText = spiritualContext.score > 0.7 ? 'High' : 
+                         spiritualContext.score > 0.4 ? 'Medium' : 'Low';
+        spiritualScoreValue.textContent = scoreText;
+
+        // Detected tradition
+        spiritualTraditionValue.textContent = spiritualContext.suggestedTradition || 'Universal';
+
+        // Spiritual tags
+        spiritualTags.innerHTML = '';
+        const allTerms = [
+            ...spiritualContext.detectedTerms.spiritual,
+            ...spiritualContext.detectedTerms.religious,
+            ...spiritualContext.detectedTerms.practices
+        ];
+
+        allTerms.slice(0, 8).forEach(term => {
+            const tag = document.createElement('span');
+            tag.className = 'spiritual-tag';
+            tag.textContent = term;
+            spiritualTags.appendChild(tag);
+        });
     }
 
     displayInsights(insights) {
-        const insightsList = document.getElementById('insights-list');
-        insightsList.innerHTML = '';
+        const insightsContainer = document.getElementById('insights-container');
+        insightsContainer.innerHTML = '';
+
+        if (insights.length === 0) {
+            insightsContainer.innerHTML = '<p>No specific insights available for this analysis.</p>';
+            return;
+        }
 
         insights.forEach(insight => {
-            const insightEl = document.createElement('div');
-            insightEl.className = `insight insight-${insight.type}`;
-            
-            insightEl.innerHTML = `
+            const insightDiv = document.createElement('div');
+            insightDiv.className = `insight insight-${insight.type}`;
+
+            insightDiv.innerHTML = `
                 <div class="insight-icon">${insight.icon}</div>
                 <div class="insight-content">
                     <div class="insight-message">${insight.message}</div>
                 </div>
             `;
-            
-            insightsList.appendChild(insightEl);
+
+            insightsContainer.appendChild(insightDiv);
         });
     }
 
@@ -885,134 +873,120 @@ class MoodDetector {
         const suggestionsGrid = document.getElementById('suggestions-grid');
         suggestionsGrid.innerHTML = '';
 
+        if (suggestions.length === 0) {
+            suggestionsGrid.innerHTML = '<p>No specific suggestions available for this analysis.</p>';
+            return;
+        }
+
         suggestions.forEach(suggestion => {
-            const suggestionEl = document.createElement('div');
-            suggestionEl.className = 'suggestion-card';
-            
-            suggestionEl.innerHTML = `
+            const suggestionCard = document.createElement('div');
+            suggestionCard.className = 'suggestion-card';
+
+            suggestionCard.innerHTML = `
                 <div class="suggestion-icon">${suggestion.icon}</div>
-                <div class="suggestion-content">
-                    <div class="suggestion-title">${suggestion.title}</div>
-                    <div class="suggestion-description">${suggestion.description}</div>
-                    <button class="suggestion-action" data-action="${suggestion.action}">
-                        Try This
-                    </button>
-                </div>
+                <div class="suggestion-title">${suggestion.title}</div>
+                <div class="suggestion-description">${suggestion.description}</div>
+                <button class="suggestion-action" data-action="${suggestion.action}">
+                    Try This
+                </button>
             `;
-            
-            // Add click handler for suggestion action
-            suggestionEl.querySelector('.suggestion-action').addEventListener('click', () => {
-                this.handleSuggestionAction(suggestion.action);
+
+            // Add click handler for suggestion actions
+            suggestionCard.querySelector('.suggestion-action').addEventListener('click', () => {
+                this.handleSuggestionAction(suggestion.action, suggestion);
             });
-            
-            suggestionsGrid.appendChild(suggestionEl);
+
+            suggestionsGrid.appendChild(suggestionCard);
         });
     }
 
-    displayMetadata(analysis) {
-        document.getElementById('analysis-type').textContent = analysis.analysisType || 'Unknown';
-        document.getElementById('processing-time').textContent = 
-            analysis.processingTime ? `${analysis.processingTime}ms` : 'N/A';
+    displayMetadata(analysisData) {
+        document.getElementById('processing-time').textContent = `${analysisData.processingTime}ms`;
+        document.getElementById('analysis-type').textContent = analysisData.analysisType;
         document.getElementById('analysis-timestamp').textContent = 
-            new Date(analysis.timestamp).toLocaleString();
+            new Date(analysisData.timestamp).toLocaleString();
     }
 
-    handleSuggestionAction(action) {
+    handleSuggestionAction(action, suggestion) {
         switch (action) {
             case 'breathing_exercise':
-                this.startBreathingExercise();
+                this.showBreathingExercise();
                 break;
-            case 'prayer_session':
-                this.openPrayerSession();
+            case 'prayer_time':
+                this.showPrayerGuidance();
                 break;
-            case 'gratitude_journal':
-                this.openGratitudeJournal();
-                break;
-            case 'meditation_session':
-                this.startMeditation();
+            case 'gratitude_practice':
+                this.showGratitudePractice();
                 break;
             case 'tasbih_counter':
                 this.openTasbihCounter();
                 break;
-            case 'spiritual_reading':
-                this.openSpiritualReading();
+            case 'spiritual_reflection':
+                this.showSpiritualReflection();
                 break;
             default:
-                console.log('Unknown suggestion action:', action);
+                alert(`Action: ${action}\n\n${suggestion.description}`);
         }
     }
 
-    // Voice recording methods
-    async startRecording() {
+    showBreathingExercise() {
+        alert('Breathing Exercise:\n\n1. Breathe in for 4 counts\n2. Hold for 7 counts\n3. Breathe out for 8 counts\n4. Repeat 4 times\n\nThis will help calm your nervous system.');
+    }
+
+    showPrayerGuidance() {
+        alert('Take a moment for prayer or meditation:\n\n• Find a quiet space\n• Focus on your breathing\n• Connect with the divine\n• Ask for peace and guidance\n• Express gratitude for your blessings');
+    }
+
+    showGratitudePractice() {
+        const gratitudeItems = prompt('List three things you\'re grateful for today (separate with commas):');
+        if (gratitudeItems) {
+            alert(`Beautiful! You\'re grateful for:\n\n${gratitudeItems.split(',').map((item, i) => `${i + 1}. ${item.trim()}`).join('\n')}\n\nGratitude opens the heart to more blessings.`);
+        }
+    }
+
+    openTasbihCounter() {
+        // This would integrate with the existing tasbih functionality
+        alert('Opening Digital Tasbih...\n\nThis would open the tasbih counter for dhikr and remembrance.');
+    }
+
+    showSpiritualReflection() {
+        alert('Spiritual Reflection Guide:\n\n• What is your heart telling you right now?\n• How can you grow closer to the divine?\n• What spiritual practices bring you peace?\n• How can you serve others today?\n\nTake time to contemplate these questions.');
+    }
+
+    startVoiceRecording() {
+        if (!this.voiceRecognition) {
+            this.showError('Voice recognition is not supported in this browser.');
+            return;
+        }
+
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            this.mediaRecorder = new MediaRecorder(stream);
-            this.audioChunks = [];
-
-            this.mediaRecorder.ondataavailable = (event) => {
-                this.audioChunks.push(event.data);
-            };
-
-            this.mediaRecorder.onstop = () => {
-                stream.getTracks().forEach(track => track.stop());
-                this.processRecording();
-            };
-
-            this.mediaRecorder.start();
-            this.isRecording = true;
+            this.voiceRecognition.start();
             
-            document.getElementById('start-recording-btn').disabled = true;
-            document.getElementById('stop-recording-btn').disabled = false;
-            document.getElementById('recording-status').innerHTML = `
-                <div class="recording-indicator active"></div>
-                <span>Recording... Click stop when finished</span>
-            `;
-
+            document.getElementById('start-voice-recording').disabled = true;
+            document.getElementById('stop-voice-recording').disabled = false;
+            document.getElementById('recording-indicator').classList.add('active');
+            document.getElementById('recording-text').textContent = 'Recording... Speak now';
+            
         } catch (error) {
-            console.error('Error starting recording:', error);
-            this.showError('Could not access microphone. Please check permissions.');
+            console.error('Voice recording error:', error);
+            this.showError('Failed to start voice recording: ' + error.message);
         }
     }
 
-    stopRecording() {
-        if (this.mediaRecorder && this.isRecording) {
-            this.mediaRecorder.stop();
-            this.isRecording = false;
-            
-            document.getElementById('start-recording-btn').disabled = false;
-            document.getElementById('stop-recording-btn').disabled = true;
-            document.getElementById('analyze-voice-btn').disabled = false;
-            
-            document.getElementById('recording-status').innerHTML = `
-                <div class="recording-indicator"></div>
-                <span>Recording complete. Ready to analyze.</span>
-            `;
+    stopVoiceRecording() {
+        if (this.voiceRecognition) {
+            this.voiceRecognition.stop();
         }
+        this.resetVoiceRecording();
     }
 
-    async processRecording() {
-        if (this.audioChunks.length > 0) {
-            const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
-            const audioUrl = URL.createObjectURL(audioBlob);
-            
-            const audioElement = document.getElementById('recorded-audio');
-            audioElement.src = audioUrl;
-            audioElement.style.display = 'block';
-            
-            // Try to get transcript using Web Speech API (if available)
-            await this.transcribeAudio();
-        }
+    resetVoiceRecording() {
+        document.getElementById('start-voice-recording').disabled = false;
+        document.getElementById('stop-voice-recording').disabled = true;
+        document.getElementById('recording-indicator').classList.remove('active');
+        document.getElementById('recording-text').textContent = 'Click "Start Recording" to begin';
     }
 
-    async transcribeAudio() {
-        // Placeholder for speech-to-text functionality
-        // In a real implementation, you would use a speech recognition service
-        document.getElementById('voice-transcript').innerHTML = `
-            <p><em>Transcript will be generated during analysis...</em></p>
-        `;
-    }
-
-    // Image handling methods
     handleImageFile(file) {
         if (!file.type.startsWith('image/')) {
             this.showError('Please select a valid image file.');
@@ -1020,88 +994,120 @@ class MoodDetector {
         }
 
         if (file.size > 10 * 1024 * 1024) { // 10MB limit
-            this.showError('Image file too large. Please select an image under 10MB.');
+            this.showError('Image file is too large. Please select a file under 10MB.');
             return;
         }
 
         const reader = new FileReader();
         reader.onload = (e) => {
-            this.displayImagePreview(e.target.result);
+            this.currentImageData = e.target.result;
+            this.showImagePreview(e.target.result);
+            document.getElementById('analyze-image-btn').disabled = false;
         };
         reader.readAsDataURL(file);
     }
 
-    displayImagePreview(imageSrc) {
-        const previewContainer = document.getElementById('image-preview');
+    showImagePreview(imageSrc) {
+        const imagePreview = document.getElementById('image-preview');
         const previewImage = document.getElementById('preview-image');
         
         previewImage.src = imageSrc;
-        previewContainer.style.display = 'block';
-        
-        document.getElementById('analyze-image-btn').disabled = false;
+        imagePreview.style.display = 'block';
     }
 
     removeImage() {
-        const previewContainer = document.getElementById('image-preview');
-        const previewImage = document.getElementById('preview-image');
-        
-        previewImage.src = '';
-        previewContainer.style.display = 'none';
-        
+        this.currentImageData = null;
+        document.getElementById('image-preview').style.display = 'none';
         document.getElementById('analyze-image-btn').disabled = true;
         document.getElementById('image-file-input').value = '';
     }
 
     async startCamera() {
         try {
-            this.videoStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: 'user' } 
-            });
-            
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             const video = document.getElementById('camera-preview');
-            video.srcObject = this.videoStream;
+            
+            video.srcObject = stream;
             video.style.display = 'block';
+            document.getElementById('capture-photo-btn').style.display = 'inline-block';
+            document.getElementById('start-camera-btn').style.display = 'none';
             
-            document.getElementById('capture-photo-btn').style.display = 'block';
-            document.getElementById('use-camera-btn').textContent = 'Stop Camera';
-            
-            this.isCapturing = true;
-
         } catch (error) {
-            console.error('Error accessing camera:', error);
-            this.showError('Could not access camera. Please check permissions.');
+            console.error('Camera access error:', error);
+            this.showError('Failed to access camera: ' + error.message);
         }
     }
 
     capturePhoto() {
         const video = document.getElementById('camera-preview');
-        const canvas = document.getElementById('camera-canvas');
-        const ctx = canvas.getContext('2d');
+        const canvas = document.createElement('canvas');
         
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         
-        ctx.drawImage(video, 0, 0);
-        const imageData = canvas.toDataURL('image/jpeg', 0.8);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
-        this.displayImagePreview(imageData);
-        this.stopCamera();
-    }
-
-    stopCamera() {
-        if (this.videoStream) {
-            this.videoStream.getTracks().forEach(track => track.stop());
-            this.videoStream = null;
+        this.currentImageData = canvas.toDataURL('image/png');
+        this.showImagePreview(this.currentImageData);
+        
+        // Stop camera
+        const stream = video.srcObject;
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
         }
         
-        document.getElementById('camera-preview').style.display = 'none';
+        video.style.display = 'none';
         document.getElementById('capture-photo-btn').style.display = 'none';
-        document.getElementById('use-camera-btn').textContent = 'Use Camera';
-        
-        this.isCapturing = false;
+        document.getElementById('start-camera-btn').style.display = 'inline-block';
+        document.getElementById('analyze-image-btn').disabled = false;
     }
 
-    // History and analytics methods
+    async saveAnalysis() {
+        if (!this.currentAnalysis) return;
+
+        try {
+            // Analysis is already saved to history by default
+            // This could trigger additional save actions like bookmarking
+            this.showSuccess('Analysis saved to your mood history!');
+            
+        } catch (error) {
+            console.error('Save analysis error:', error);
+            this.showError('Failed to save analysis.');
+        }
+    }
+
+    async shareAnalysis() {
+        if (!this.currentAnalysis) return;
+
+        const shareText = `My mood analysis: ${this.currentAnalysis.primaryEmotion} (${Math.round(this.currentAnalysis.confidence * 100)}% confidence) - Mirror of Heart App`;
+        
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: 'My Mood Analysis',
+                    text: shareText
+                });
+            } catch (error) {
+                console.error('Share error:', error);
+            }
+        } else {
+            // Fallback to clipboard
+            try {
+                await navigator.clipboard.writeText(shareText);
+                this.showSuccess('Analysis copied to clipboard!');
+            } catch (error) {
+                console.error('Clipboard error:', error);
+                this.showError('Failed to copy to clipboard.');
+            }
+        }
+    }
+
+    clearResults() {
+        document.getElementById('mood-results').style.display = 'none';
+        this.currentAnalysis = null;
+    }
+
     async toggleHistoryPanel(show = null) {
         const panel = document.getElementById('mood-history-panel');
         const isVisible = panel.classList.contains('visible');
@@ -1128,7 +1134,7 @@ class MoodDetector {
         
         if (show) {
             panel.classList.add('visible');
-            await this.loadAnalytics();
+            await this.loadAnalyticsData();
         } else {
             panel.classList.remove('visible');
         }
@@ -1153,11 +1159,13 @@ class MoodDetector {
             
             if (response.success) {
                 this.displayHistory(response.data.entries);
+            } else {
+                throw new Error(response.error);
             }
 
         } catch (error) {
-            console.error('Error loading history:', error);
-            this.showError('Failed to load mood history');
+            console.error('Load history error:', error);
+            this.showError('Failed to load mood history.');
         }
     }
 
@@ -1169,7 +1177,7 @@ class MoodDetector {
                 <div class="empty-history">
                     <div class="empty-icon">📊</div>
                     <p>No mood entries found</p>
-                    <p>Start analyzing your mood to see history here</p>
+                    <p>Start analyzing your mood to see your history here</p>
                 </div>
             `;
             return;
@@ -1178,23 +1186,17 @@ class MoodDetector {
         historyContent.innerHTML = entries.map(entry => `
             <div class="history-entry">
                 <div class="history-header">
-                    <div class="history-emotion emotion-${entry.primaryEmotion}">
+                    <span class="history-emotion emotion-${entry.primaryEmotion}">
                         ${entry.primaryEmotion}
-                    </div>
-                    <div class="history-date">
+                    </span>
+                    <span class="history-date">
                         ${new Date(entry.createdAt).toLocaleDateString()}
-                    </div>
+                    </span>
                 </div>
                 <div class="history-details">
-                    <div class="history-confidence">
-                        ${Math.round(entry.confidence * 100)}% confidence
-                    </div>
-                    <div class="history-intensity">
-                        ${entry.intensity} intensity
-                    </div>
-                    <div class="history-type">
-                        ${entry.analysisType} analysis
-                    </div>
+                    <span>Confidence: ${Math.round(entry.confidence * 100)}%</span>
+                    <span>Intensity: ${entry.intensity}</span>
+                    <span>Type: ${entry.analysisType}</span>
                 </div>
                 ${entry.insights && entry.insights.length > 0 ? `
                     <div class="history-insights">
@@ -1209,64 +1211,69 @@ class MoodDetector {
         `).join('');
     }
 
-    async loadAnalytics() {
+    async loadAnalyticsData() {
         try {
             const response = await this.makeApiRequest('/api/mood/analytics?timeframe=30d');
             
             if (response.success) {
                 this.displayAnalytics(response.data);
+            } else {
+                throw new Error(response.error);
             }
 
         } catch (error) {
-            console.error('Error loading analytics:', error);
-            this.showError('Failed to load mood analytics');
+            console.error('Load analytics error:', error);
+            this.showError('Failed to load mood analytics.');
         }
     }
 
-    displayAnalytics(analytics) {
+    displayAnalytics(analyticsData) {
         const analyticsContent = document.getElementById('analytics-content');
         
         analyticsContent.innerHTML = `
             <div class="analytics-overview">
                 <div class="analytics-card">
-                    <div class="analytics-number">${analytics.totalEntries}</div>
+                    <div class="analytics-number">${analyticsData.totalEntries}</div>
                     <div class="analytics-label">Total Analyses</div>
                 </div>
                 <div class="analytics-card">
-                    <div class="analytics-number emotion-${analytics.dominantEmotion}">
-                        ${analytics.dominantEmotion}
+                    <div class="analytics-number emotion-${analyticsData.dominantEmotion?.toLowerCase() || 'neutral'}">
+                        ${analyticsData.dominantEmotion || 'None'}
                     </div>
                     <div class="analytics-label">Dominant Emotion</div>
                 </div>
                 <div class="analytics-card">
-                    <div class="analytics-number">${Math.round(analytics.averageConfidence * 100)}%</div>
+                    <div class="analytics-number">${Math.round(analyticsData.averageConfidence * 100)}%</div>
                     <div class="analytics-label">Avg Confidence</div>
                 </div>
                 <div class="analytics-card">
-                    <div class="analytics-number">${Math.round(analytics.moodStability * 100)}%</div>
+                    <div class="analytics-number">${Math.round(analyticsData.moodStability * 100)}%</div>
                     <div class="analytics-label">Mood Stability</div>
                 </div>
             </div>
-
-            <div class="emotion-distribution">
-                <h4>Emotion Distribution</h4>
+            
+            <div class="emotion-chart">
+                <h4>Emotion Distribution (${analyticsData.timeframe})</h4>
                 <div class="distribution-chart">
-                    ${Object.entries(analytics.emotionDistribution).map(([emotion, count]) => `
-                        <div class="distribution-bar">
-                            <div class="distribution-label">${emotion}</div>
-                            <div class="distribution-fill emotion-${emotion}" 
-                                 style="width: ${(count / analytics.totalEntries) * 100}%">
-                                <span class="distribution-count">${count}</span>
+                    ${Object.entries(analyticsData.emotionDistribution || {}).map(([emotion, count]) => {
+                        const maxCount = Math.max(...Object.values(analyticsData.emotionDistribution));
+                        const percentage = (count / maxCount) * 100;
+                        return `
+                            <div class="distribution-bar">
+                                <div class="distribution-label">${emotion}</div>
+                                <div class="distribution-fill emotion-${emotion}" style="width: ${percentage}%">
+                                    <span class="distribution-count">${count}</span>
+                                </div>
                             </div>
-                        </div>
-                    `).join('')}
+                        `;
+                    }).join('')}
                 </div>
             </div>
-
-            <div class="intensity-distribution">
+            
+            <div class="intensity-chart">
                 <h4>Intensity Distribution</h4>
                 <div class="intensity-chart">
-                    ${Object.entries(analytics.intensityDistribution).map(([intensity, count]) => `
+                    ${Object.entries(analyticsData.intensityDistribution || {}).map(([intensity, count]) => `
                         <div class="intensity-item">
                             <div class="intensity-label">${intensity}</div>
                             <div class="intensity-value">${count}</div>
@@ -1274,72 +1281,18 @@ class MoodDetector {
                     `).join('')}
                 </div>
             </div>
-
-            ${analytics.insights && analytics.insights.length > 0 ? `
-                <div class="analytics-insights">
+            
+            ${analyticsData.insights && analyticsData.insights.length > 0 ? `
+                <div class="insights">
                     <h4>Key Insights</h4>
-                    ${analytics.insights.map(insight => `
-                        <div class="analytics-insight">
-                            <div class="insight-title">${insight.title}</div>
-                            <div class="insight-message">${insight.message}</div>
-                        </div>
-                    `).join('')}
+                    <ul>
+                        ${analyticsData.insights.map(insight => `
+                            <li>${insight.message}</li>
+                        `).join('')}
+                    </ul>
                 </div>
             ` : ''}
         `;
-    }
-
-    // Utility methods
-    async loadSupportedEmotions() {
-        try {
-            const response = await this.makeApiRequest('/api/mood/emotions');
-            if (response.success) {
-                this.supportedEmotions = response.data.emotions;
-                this.populateEmotionFilters();
-            }
-        } catch (error) {
-            console.error('Error loading supported emotions:', error);
-        }
-    }
-
-    populateEmotionFilters() {
-        const emotionFilter = document.getElementById('history-emotion-filter');
-        
-        this.supportedEmotions.forEach(emotion => {
-            const option = document.createElement('option');
-            option.value = emotion;
-            option.textContent = emotion.charAt(0).toUpperCase() + emotion.slice(1);
-            emotionFilter.appendChild(option);
-        });
-    }
-
-    async loadUserPreferences() {
-        try {
-            const response = await this.makeApiRequest('/api/user/me');
-            if (response.success) {
-                this.userPreferences = response.data.spiritualPreferences || {};
-            }
-        } catch (error) {
-            console.error('Error loading user preferences:', error);
-        }
-    }
-
-    getContextInfo() {
-        const now = new Date();
-        return {
-            timeOfDay: this.getTimeOfDay(now.getHours()),
-            dayOfWeek: now.toLocaleDateString('en-US', { weekday: 'long' }),
-            spiritualPreferences: this.userPreferences,
-            location: null // Could be added with geolocation API
-        };
-    }
-
-    getTimeOfDay(hour) {
-        if (hour < 6) return 'early_morning';
-        if (hour < 12) return 'morning';
-        if (hour < 18) return 'afternoon';
-        if (hour < 22) return 'evening';
-        return 'night';
     }
 
     async makeApiRequest(url, options = {}) {
@@ -1355,7 +1308,7 @@ class MoodDetector {
         const response = await fetch(url, { ...defaultOptions, ...options });
         
         if (response.status === 429) {
-            throw new Error('Too many requests. Please wait a moment before trying again.');
+            throw new Error('Too many requests. Please wait a moment before analyzing again.');
         }
         
         if (response.status === 401) {
@@ -1366,26 +1319,52 @@ class MoodDetector {
         return await response.json();
     }
 
-    async blobToBase64(blob) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
+    handleAnalysisError(error) {
+        this.retryAttempts++;
+        
+        if (error.message.includes('Too many requests')) {
+            this.showError('Rate limit reached. Please wait a moment before analyzing again.');
+        } else if (error.message.includes('timeout')) {
+            this.showError('Analysis timed out. Please try again.');
+        } else if (this.retryAttempts < this.maxRetryAttempts) {
+            this.showError(`Analysis failed. Retrying... (${this.retryAttempts}/${this.maxRetryAttempts})`);
+            setTimeout(() => {
+                // Retry the last analysis
+                const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
+                this.analyzeCurrentTab(activeTab);
+            }, 2000);
+        } else {
+            this.showError('Analysis failed after multiple attempts. Please try again later.');
+            this.retryAttempts = 0;
+        }
+    }
+
+    updateCharacterCount(input, countElement) {
+        const count = input.value.length;
+        const max = input.maxLength;
+        
+        countElement.textContent = count;
+        
+        if (count > max * 0.9) {
+            countElement.style.color = '#ef4444';
+        } else if (count > max * 0.7) {
+            countElement.style.color = '#f59e0b';
+        } else {
+            countElement.style.color = '#6b7280';
+        }
+    }
+
+    updateStatus(status, text) {
+        const indicator = document.getElementById('mood-status-indicator');
+        const statusText = document.getElementById('mood-status-text');
+        
+        indicator.className = `status-indicator ${status}`;
+        statusText.textContent = text;
     }
 
     showLoading(show) {
-        const loadingOverlay = document.getElementById('mood-loading');
-        loadingOverlay.style.display = show ? 'flex' : 'none';
-    }
-
-    updateStatus(status, message) {
-        const statusIndicator = document.getElementById('mood-status');
-        const statusText = document.getElementById('mood-status-text');
-        
-        statusIndicator.className = `status-indicator ${status}`;
-        statusText.textContent = message;
+        const overlay = document.getElementById('mood-loading-overlay');
+        overlay.style.display = show ? 'flex' : 'none';
     }
 
     showError(message) {
@@ -1406,84 +1385,44 @@ class MoodDetector {
         }, 5000);
     }
 
-    // Suggestion action handlers
-    startBreathingExercise() {
-        alert('Breathing exercise feature coming soon!');
-    }
-
-    openPrayerSession() {
-        alert('Prayer session feature coming soon!');
-    }
-
-    openGratitudeJournal() {
-        // Navigate to journal section
-        const journalSection = document.getElementById('journal-section');
-        if (journalSection) {
-            journalSection.scrollIntoView({ behavior: 'smooth' });
-            const journalInput = document.getElementById('journal-input');
-            if (journalInput) {
-                journalInput.focus();
-                journalInput.placeholder = 'Write about what you\'re grateful for today...';
-            }
+    showSuccess(message) {
+        // Create or update success notification
+        let successNotification = document.getElementById('mood-success-notification');
+        if (!successNotification) {
+            successNotification = document.createElement('div');
+            successNotification.id = 'mood-success-notification';
+            successNotification.className = 'error-notification';
+            successNotification.style.background = '#10b981';
+            document.body.appendChild(successNotification);
         }
-    }
-
-    startMeditation() {
-        alert('Meditation session feature coming soon!');
-    }
-
-    openTasbihCounter() {
-        // Navigate to tasbih section
-        const tasbihSection = document.getElementById('tasbih-section');
-        if (tasbihSection) {
-            tasbihSection.scrollIntoView({ behavior: 'smooth' });
-        }
-    }
-
-    openSpiritualReading() {
-        alert('Spiritual reading feature coming soon!');
-    }
-
-    saveAnalysis() {
-        if (this.currentAnalysis) {
-            // Analysis is already saved automatically
-            this.showError('Analysis has been saved to your history.');
-        }
-    }
-
-    shareAnalysis() {
-        if (this.currentAnalysis) {
-            const shareText = `I just analyzed my mood and I'm feeling ${this.currentAnalysis.primaryEmotion} with ${Math.round(this.currentAnalysis.confidence * 100)}% confidence. #MoodTracking #SelfAwareness`;
-            
-            if (navigator.share) {
-                navigator.share({
-                    title: 'My Mood Analysis',
-                    text: shareText
-                });
-            } else {
-                navigator.clipboard.writeText(shareText);
-                this.showError('Analysis summary copied to clipboard!');
-            }
-        }
+        
+        successNotification.textContent = message;
+        successNotification.style.display = 'block';
+        
+        setTimeout(() => {
+            successNotification.style.display = 'none';
+        }, 3000);
     }
 
     // Cleanup method
     destroy() {
-        if (this.videoStream) {
-            this.videoStream.getTracks().forEach(track => track.stop());
-        }
-        
-        if (this.mediaRecorder && this.isRecording) {
-            this.mediaRecorder.stop();
-        }
-        
         this.analysisHistory = [];
         this.currentAnalysis = null;
+        this.currentImageData = null;
+        
+        if (this.voiceRecognition) {
+            this.voiceRecognition.abort();
+        }
+        
+        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+            this.mediaRecorder.stop();
+        }
     }
 }
 
 // Initialize mood detector when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+    // Only initialize if user is logged in
     if (localStorage.getItem('token')) {
         window.moodDetector = new MoodDetector();
     }
