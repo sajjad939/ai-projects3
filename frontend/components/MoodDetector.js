@@ -1,12 +1,8 @@
 class MoodDetector {
     constructor() {
-        this.isAnalyzing = false;
         this.currentAnalysis = null;
         this.analysisHistory = [];
-        this.voiceRecognition = null;
-        this.mediaRecorder = null;
-        this.audioChunks = [];
-        this.currentImageData = null;
+        this.isAnalyzing = false;
         this.retryAttempts = 0;
         this.maxRetryAttempts = 3;
         
@@ -16,10 +12,9 @@ class MoodDetector {
     init() {
         this.createMoodInterface();
         this.bindEvents();
-        this.setupVoiceRecognition();
         this.loadAnalyticsData();
         
-        // Auto-focus text input
+        // Auto-focus first input
         setTimeout(() => {
             const textInput = document.getElementById('mood-text-input');
             if (textInput) textInput.focus();
@@ -36,7 +31,7 @@ class MoodDetector {
                 <div class="mood-title">
                     <h2>Mood Detection</h2>
                     <div class="mood-status">
-                        <span class="status-indicator ready" id="mood-status-indicator"></span>
+                        <span class="status-indicator" id="mood-status-indicator"></span>
                         <span id="mood-status-text">Ready to analyze</span>
                     </div>
                 </div>
@@ -97,14 +92,14 @@ class MoodDetector {
                     <div class="text-input-section">
                         <textarea 
                             id="mood-text-input" 
-                            placeholder="Share your thoughts, feelings, or what's on your mind..."
+                            placeholder="Share your thoughts and feelings... How are you doing today?"
                             rows="4"
                             maxlength="5000"
                         ></textarea>
                         <div class="input-footer">
                             <div class="input-options">
                                 <label>
-                                    <input type="checkbox" id="include-spiritual-context"> 
+                                    <input type="checkbox" id="include-spiritual-context" checked>
                                     Include spiritual context
                                 </label>
                             </div>
@@ -133,7 +128,6 @@ class MoodDetector {
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
                                     <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                                    <path d="M12 19v4M8 23h8"/>
                                 </svg>
                                 Start Recording
                             </button>
@@ -145,15 +139,12 @@ class MoodDetector {
                             </button>
                         </div>
                         <div class="recording-status" id="recording-status">
-                            <span class="recording-indicator" id="recording-indicator"></span>
+                            <div class="recording-indicator" id="recording-indicator"></div>
                             <span id="recording-text">Click "Start Recording" to begin</span>
                         </div>
-                        <textarea 
-                            id="voice-transcript" 
-                            class="voice-transcript" 
-                            placeholder="Voice transcript will appear here..."
-                            readonly
-                        ></textarea>
+                        <div class="voice-transcript" id="voice-transcript">
+                            Voice transcript will appear here...
+                        </div>
                         <button id="analyze-voice-btn" class="analyze-btn" disabled>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M9 12l2 2 4-4"/>
@@ -173,29 +164,25 @@ class MoodDetector {
                                     <circle cx="8.5" cy="8.5" r="1.5"/>
                                     <polyline points="21,15 16,10 5,21"/>
                                 </svg>
-                                <p>Drop an image here or click to upload</p>
-                                <p class="upload-hint">Supports JPG, PNG, GIF up to 10MB</p>
+                                <p>Upload an image or take a photo</p>
+                                <p class="upload-hint">Drag and drop or click to select</p>
                             </div>
                             <input type="file" id="image-file-input" accept="image/*" style="display: none;">
                         </div>
-                        
                         <div class="camera-section">
-                            <button id="start-camera-btn" class="btn-secondary">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <video id="camera-preview" autoplay playsinline style="display: none;"></video>
+                            <div class="image-preview" id="image-preview" style="display: none;">
+                                <img id="preview-image" alt="Selected image">
+                                <button class="btn-remove" id="remove-image">×</button>
+                            </div>
+                            <button id="camera-btn" class="btn-secondary">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                                     <circle cx="12" cy="13" r="4"/>
                                 </svg>
                                 Use Camera
                             </button>
-                            <video id="camera-preview" autoplay playsinline style="display: none;"></video>
-                            <button id="capture-photo-btn" class="btn-primary" style="display: none;">Capture Photo</button>
                         </div>
-
-                        <div class="image-preview" id="image-preview" style="display: none;">
-                            <img id="preview-image" alt="Preview">
-                            <button class="btn-remove" id="remove-image-btn">×</button>
-                        </div>
-
                         <button id="analyze-image-btn" class="analyze-btn" disabled>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M9 12l2 2 4-4"/>
@@ -209,35 +196,29 @@ class MoodDetector {
                 <div class="tab-content" id="combined-tab">
                     <div class="combined-input-section">
                         <div class="combined-text">
-                            <label for="combined-text-input">Text Input (Optional)</label>
+                            <label for="combined-text-input">Text (Optional)</label>
                             <textarea 
                                 id="combined-text-input" 
                                 placeholder="Add text to complement your voice or image..."
                                 rows="3"
-                                maxlength="5000"
+                                maxlength="2000"
                             ></textarea>
                         </div>
-                        
                         <div class="combined-options">
                             <label>
-                                <input type="checkbox" id="combined-include-voice"> 
+                                <input type="checkbox" id="combined-voice">
                                 Include voice recording
                             </label>
                             <label>
-                                <input type="checkbox" id="combined-include-image"> 
+                                <input type="checkbox" id="combined-image">
                                 Include image
                             </label>
-                            <label>
-                                <input type="checkbox" id="combined-spiritual-context"> 
-                                Include spiritual context
-                            </label>
                         </div>
-
                         <button id="analyze-combined-btn" class="analyze-btn">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M9 12l2 2 4-4"/>
                             </svg>
-                            Analyze Combined Input
+                            Analyze Combined
                         </button>
                     </div>
                 </div>
@@ -248,9 +229,8 @@ class MoodDetector {
                 <div class="results-header">
                     <h3>Analysis Results</h3>
                     <div class="results-actions">
-                        <button id="save-analysis-btn" class="btn-secondary">Save</button>
-                        <button id="share-analysis-btn" class="btn-secondary">Share</button>
-                        <button id="clear-results-btn" class="btn-icon">×</button>
+                        <button id="save-result-btn" class="btn-secondary">Save</button>
+                        <button id="share-result-btn" class="btn-secondary">Share</button>
                     </div>
                 </div>
 
@@ -259,9 +239,9 @@ class MoodDetector {
                     <div class="emotion-display">
                         <div class="emotion-icon" id="emotion-icon">😊</div>
                         <div class="emotion-info">
-                            <div class="emotion-name" id="emotion-name">Happy</div>
-                            <div class="emotion-confidence" id="emotion-confidence">85% confidence</div>
-                            <div class="emotion-intensity" id="emotion-intensity">Medium intensity</div>
+                            <div class="emotion-name" id="emotion-name">Peaceful</div>
+                            <div class="emotion-confidence" id="emotion-confidence">Confidence: 85%</div>
+                            <div class="emotion-intensity" id="emotion-intensity">Intensity: Medium</div>
                         </div>
                     </div>
                 </div>
@@ -289,7 +269,7 @@ class MoodDetector {
                 <!-- Insights Section -->
                 <div class="insights-section" id="insights-section">
                     <h4>Insights</h4>
-                    <div id="insights-container"></div>
+                    <div id="insights-content"></div>
                 </div>
 
                 <!-- Suggestions Section -->
@@ -315,6 +295,12 @@ class MoodDetector {
                 </div>
             </div>
 
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loading-overlay" style="display: none;">
+                <div class="loading-spinner"></div>
+                <p id="loading-text">Analyzing your mood...</p>
+            </div>
+
             <!-- History Panel -->
             <div class="mood-history-panel" id="mood-history-panel">
                 <div class="panel-header">
@@ -324,7 +310,7 @@ class MoodDetector {
                 <div class="history-filters">
                     <select id="history-timeframe">
                         <option value="7d">Last 7 days</option>
-                        <option value="30d" selected>Last 30 days</option>
+                        <option value="30d">Last 30 days</option>
                         <option value="90d">Last 90 days</option>
                     </select>
                     <select id="history-emotion-filter">
@@ -356,32 +342,31 @@ class MoodDetector {
                 </div>
             </div>
 
-            <!-- Loading Overlay -->
-            <div class="loading-overlay" id="mood-loading-overlay" style="display: none;">
-                <div class="loading-spinner"></div>
-                <p id="loading-text">Analyzing your mood...</p>
+            <!-- Error Notification -->
+            <div class="error-notification" id="error-notification" style="display: none;">
+                <span id="error-message">An error occurred</span>
             </div>
         `;
 
-        // Find the mood block or create it
-        let moodBlock = document.getElementById('mood-section');
-        if (!moodBlock) {
-            moodBlock = document.createElement('div');
-            moodBlock.id = 'mood-section';
-            moodBlock.className = 'chatgpt-block';
+        // Find the appropriate container and insert the mood detector
+        let targetContainer = document.getElementById('mood-section');
+        if (!targetContainer) {
+            // Create a new block in the first column
+            targetContainer = document.createElement('div');
+            targetContainer.id = 'mood-section';
+            targetContainer.className = 'chatgpt-block';
             
-            // Insert into the second column
-            const columns = document.querySelectorAll('.chatgpt-column');
-            const secondColumn = columns[1] || columns[0];
-            if (secondColumn) {
-                secondColumn.appendChild(moodBlock);
+            const firstColumn = document.querySelector('.chatgpt-column');
+            if (firstColumn) {
+                firstColumn.appendChild(targetContainer);
             } else {
-                document.body.appendChild(moodBlock);
+                // Fallback: append to body
+                document.body.appendChild(targetContainer);
             }
         }
         
-        moodBlock.innerHTML = '';
-        moodBlock.appendChild(moodContainer);
+        targetContainer.innerHTML = '';
+        targetContainer.appendChild(moodContainer);
     }
 
     bindEvents() {
@@ -392,163 +377,110 @@ class MoodDetector {
             }
         });
 
-        // Text input events
+        // Text analysis
         const textInput = document.getElementById('mood-text-input');
-        const textCharCount = document.getElementById('text-char-count');
+        const analyzeTextBtn = document.getElementById('analyze-text-btn');
         
-        textInput.addEventListener('input', () => {
-            textCharCount.textContent = textInput.value.length;
-            this.updateCharacterCount(textInput, textCharCount);
-        });
-
-        // Analyze buttons
-        document.getElementById('analyze-text-btn').addEventListener('click', () => {
-            this.analyzeText();
-        });
-
-        document.getElementById('analyze-voice-btn').addEventListener('click', () => {
-            this.analyzeVoice();
-        });
-
-        document.getElementById('analyze-image-btn').addEventListener('click', () => {
-            this.analyzeImage();
-        });
-
-        document.getElementById('analyze-combined-btn').addEventListener('click', () => {
-            this.analyzeCombined();
-        });
+        if (textInput) {
+            textInput.addEventListener('input', () => {
+                this.updateCharacterCount('text');
+                this.validateTextInput();
+            });
+        }
+        
+        if (analyzeTextBtn) {
+            analyzeTextBtn.addEventListener('click', () => this.analyzeText());
+        }
 
         // Voice recording
-        document.getElementById('start-voice-recording').addEventListener('click', () => {
-            this.startVoiceRecording();
-        });
-
-        document.getElementById('stop-voice-recording').addEventListener('click', () => {
-            this.stopVoiceRecording();
-        });
+        const startRecordingBtn = document.getElementById('start-voice-recording');
+        const stopRecordingBtn = document.getElementById('stop-voice-recording');
+        const analyzeVoiceBtn = document.getElementById('analyze-voice-btn');
+        
+        if (startRecordingBtn) {
+            startRecordingBtn.addEventListener('click', () => this.startVoiceRecording());
+        }
+        if (stopRecordingBtn) {
+            stopRecordingBtn.addEventListener('click', () => this.stopVoiceRecording());
+        }
+        if (analyzeVoiceBtn) {
+            analyzeVoiceBtn.addEventListener('click', () => this.analyzeVoice());
+        }
 
         // Image upload
         const imageUploadArea = document.getElementById('image-upload-area');
         const imageFileInput = document.getElementById('image-file-input');
+        const cameraBtn = document.getElementById('camera-btn');
+        const analyzeImageBtn = document.getElementById('analyze-image-btn');
+        const removeImageBtn = document.getElementById('remove-image');
+        
+        if (imageUploadArea) {
+            imageUploadArea.addEventListener('click', () => imageFileInput?.click());
+            imageUploadArea.addEventListener('dragover', (e) => this.handleDragOver(e));
+            imageUploadArea.addEventListener('drop', (e) => this.handleImageDrop(e));
+        }
+        
+        if (imageFileInput) {
+            imageFileInput.addEventListener('change', (e) => this.handleImageSelect(e));
+        }
+        
+        if (cameraBtn) {
+            cameraBtn.addEventListener('click', () => this.toggleCamera());
+        }
+        
+        if (analyzeImageBtn) {
+            analyzeImageBtn.addEventListener('click', () => this.analyzeImage());
+        }
+        
+        if (removeImageBtn) {
+            removeImageBtn.addEventListener('click', () => this.removeImage());
+        }
 
-        imageUploadArea.addEventListener('click', () => {
-            imageFileInput.click();
-        });
-
-        imageUploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            imageUploadArea.classList.add('drag-over');
-        });
-
-        imageUploadArea.addEventListener('dragleave', () => {
-            imageUploadArea.classList.remove('drag-over');
-        });
-
-        imageUploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            imageUploadArea.classList.remove('drag-over');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                this.handleImageFile(files[0]);
-            }
-        });
-
-        imageFileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                this.handleImageFile(e.target.files[0]);
-            }
-        });
-
-        // Camera
-        document.getElementById('start-camera-btn').addEventListener('click', () => {
-            this.startCamera();
-        });
-
-        document.getElementById('capture-photo-btn').addEventListener('click', () => {
-            this.capturePhoto();
-        });
-
-        document.getElementById('remove-image-btn').addEventListener('click', () => {
-            this.removeImage();
-        });
-
-        // Results actions
-        document.getElementById('save-analysis-btn').addEventListener('click', () => {
-            this.saveAnalysis();
-        });
-
-        document.getElementById('share-analysis-btn').addEventListener('click', () => {
-            this.shareAnalysis();
-        });
-
-        document.getElementById('clear-results-btn').addEventListener('click', () => {
-            this.clearResults();
-        });
+        // Combined analysis
+        const analyzeCombinedBtn = document.getElementById('analyze-combined-btn');
+        if (analyzeCombinedBtn) {
+            analyzeCombinedBtn.addEventListener('click', () => this.analyzeCombined());
+        }
 
         // History and analytics
-        document.getElementById('mood-history-btn').addEventListener('click', () => {
-            this.toggleHistoryPanel();
-        });
-
-        document.getElementById('mood-analytics-btn').addEventListener('click', () => {
-            this.toggleAnalyticsPanel();
-        });
-
-        document.getElementById('close-history-btn').addEventListener('click', () => {
-            this.toggleHistoryPanel(false);
-        });
-
-        document.getElementById('close-analytics-btn').addEventListener('click', () => {
-            this.toggleAnalyticsPanel(false);
-        });
+        const historyBtn = document.getElementById('mood-history-btn');
+        const analyticsBtn = document.getElementById('mood-analytics-btn');
+        const closeHistoryBtn = document.getElementById('close-history-btn');
+        const closeAnalyticsBtn = document.getElementById('close-analytics-btn');
+        
+        if (historyBtn) {
+            historyBtn.addEventListener('click', () => this.toggleHistoryPanel());
+        }
+        if (analyticsBtn) {
+            analyticsBtn.addEventListener('click', () => this.toggleAnalyticsPanel());
+        }
+        if (closeHistoryBtn) {
+            closeHistoryBtn.addEventListener('click', () => this.toggleHistoryPanel(false));
+        }
+        if (closeAnalyticsBtn) {
+            closeAnalyticsBtn.addEventListener('click', () => this.toggleAnalyticsPanel(false));
+        }
 
         // History filters
-        document.getElementById('history-timeframe').addEventListener('change', () => {
-            this.loadHistory();
-        });
+        const historyTimeframe = document.getElementById('history-timeframe');
+        const historyEmotionFilter = document.getElementById('history-emotion-filter');
+        
+        if (historyTimeframe) {
+            historyTimeframe.addEventListener('change', () => this.loadHistory());
+        }
+        if (historyEmotionFilter) {
+            historyEmotionFilter.addEventListener('change', () => this.loadHistory());
+        }
 
-        document.getElementById('history-emotion-filter').addEventListener('change', () => {
-            this.loadHistory();
-        });
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                e.preventDefault();
-                const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
-                this.analyzeCurrentTab(activeTab);
-            }
-        });
-    }
-
-    setupVoiceRecognition() {
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            this.voiceRecognition = new SpeechRecognition();
-            
-            this.voiceRecognition.continuous = false;
-            this.voiceRecognition.interimResults = false;
-            this.voiceRecognition.lang = 'en-US';
-
-            this.voiceRecognition.onresult = (event) => {
-                const transcript = event.results[0][0].transcript;
-                document.getElementById('voice-transcript').value = transcript;
-                document.getElementById('analyze-voice-btn').disabled = false;
-            };
-
-            this.voiceRecognition.onerror = (event) => {
-                console.error('Speech recognition error:', event.error);
-                this.showError('Speech recognition error: ' + event.error);
-                this.resetVoiceRecording();
-            };
-
-            this.voiceRecognition.onend = () => {
-                this.resetVoiceRecording();
-            };
-        } else {
-            // Disable voice features if not supported
-            document.querySelector('[data-tab="voice"]').disabled = true;
-            document.querySelector('[data-tab="voice"]').title = 'Voice recognition not supported in this browser';
+        // Result actions
+        const saveResultBtn = document.getElementById('save-result-btn');
+        const shareResultBtn = document.getElementById('share-result-btn');
+        
+        if (saveResultBtn) {
+            saveResultBtn.addEventListener('click', () => this.saveResult());
+        }
+        if (shareResultBtn) {
+            shareResultBtn.addEventListener('click', () => this.shareResult());
         }
     }
 
@@ -568,199 +500,415 @@ class MoodDetector {
         // Focus appropriate input
         setTimeout(() => {
             if (tabName === 'text') {
-                document.getElementById('mood-text-input').focus();
+                document.getElementById('mood-text-input')?.focus();
             } else if (tabName === 'combined') {
-                document.getElementById('combined-text-input').focus();
+                document.getElementById('combined-text-input')?.focus();
             }
         }, 100);
     }
 
+    updateCharacterCount(type) {
+        const input = document.getElementById(type === 'text' ? 'mood-text-input' : 'combined-text-input');
+        const counter = document.getElementById(type === 'text' ? 'text-char-count' : 'combined-char-count');
+        
+        if (input && counter) {
+            const count = input.value.length;
+            counter.textContent = count;
+            
+            // Update color based on length
+            if (count > 4500) {
+                counter.style.color = '#e74c3c';
+            } else if (count > 4000) {
+                counter.style.color = '#f39c12';
+            } else {
+                counter.style.color = '#666';
+            }
+        }
+    }
+
+    validateTextInput() {
+        const textInput = document.getElementById('mood-text-input');
+        const analyzeBtn = document.getElementById('analyze-text-btn');
+        
+        if (textInput && analyzeBtn) {
+            const hasText = textInput.value.trim().length > 0;
+            analyzeBtn.disabled = !hasText || this.isAnalyzing;
+        }
+    }
+
     async analyzeText() {
         const textInput = document.getElementById('mood-text-input');
-        const text = textInput.value.trim();
+        const includeSpiritual = document.getElementById('include-spiritual-context');
         
-        if (!text) {
-            this.showError('Please enter some text to analyze.');
+        if (!textInput || !textInput.value.trim()) {
+            this.showError('Please enter some text to analyze');
             return;
         }
 
-        const includeSpiritual = document.getElementById('include-spiritual-context').checked;
-
-        await this.performAnalysis({
-            type: 'text',
-            content: text,
-            context: {
-                includeSpiritual,
-                timeOfDay: new Date().getHours()
+        const analysisData = {
+            input: {
+                type: 'text',
+                content: textInput.value.trim(),
+                context: {
+                    includeSpiritual: includeSpiritual?.checked || false,
+                    timeOfDay: this.getTimeOfDay()
+                }
+            },
+            options: {
+                includeInsights: true,
+                includeSuggestions: true,
+                saveToHistory: true
             }
-        });
+        };
+
+        await this.performAnalysis(analysisData);
+    }
+
+    async startVoiceRecording() {
+        try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                this.showError('Voice recording is not supported in this browser');
+                return;
+            }
+
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            this.mediaRecorder = new MediaRecorder(stream);
+            this.audioChunks = [];
+
+            this.mediaRecorder.ondataavailable = (event) => {
+                this.audioChunks.push(event.data);
+            };
+
+            this.mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
+                this.processAudioRecording(audioBlob);
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            this.mediaRecorder.start();
+            this.updateRecordingUI(true);
+
+        } catch (error) {
+            console.error('Voice recording error:', error);
+            this.showError('Failed to start voice recording. Please check microphone permissions.');
+        }
+    }
+
+    stopVoiceRecording() {
+        if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+            this.mediaRecorder.stop();
+            this.updateRecordingUI(false);
+        }
+    }
+
+    updateRecordingUI(isRecording) {
+        const startBtn = document.getElementById('start-voice-recording');
+        const stopBtn = document.getElementById('stop-voice-recording');
+        const indicator = document.getElementById('recording-indicator');
+        const text = document.getElementById('recording-text');
+        const analyzeBtn = document.getElementById('analyze-voice-btn');
+
+        if (startBtn) startBtn.disabled = isRecording;
+        if (stopBtn) stopBtn.disabled = !isRecording;
+        if (analyzeBtn) analyzeBtn.disabled = isRecording;
+
+        if (indicator) {
+            indicator.classList.toggle('active', isRecording);
+        }
+
+        if (text) {
+            text.textContent = isRecording ? 'Recording... Click stop when finished' : 'Recording complete';
+        }
+    }
+
+    async processAudioRecording(audioBlob) {
+        try {
+            // Convert audio to base64
+            const reader = new FileReader();
+            reader.onload = () => {
+                this.currentAudioData = reader.result.split(',')[1]; // Remove data URL prefix
+                document.getElementById('analyze-voice-btn').disabled = false;
+                
+                // Try to get transcript using Web Speech API
+                this.transcribeAudio();
+            };
+            reader.readAsDataURL(audioBlob);
+
+        } catch (error) {
+            console.error('Audio processing error:', error);
+            this.showError('Failed to process audio recording');
+        }
+    }
+
+    transcribeAudio() {
+        // For now, show placeholder text
+        // In a real implementation, you would use a speech-to-text service
+        const transcript = document.getElementById('voice-transcript');
+        if (transcript) {
+            transcript.textContent = 'Audio recorded successfully. Click "Analyze Voice" to process.';
+        }
     }
 
     async analyzeVoice() {
-        const transcript = document.getElementById('voice-transcript').value.trim();
-        
-        if (!transcript) {
-            this.showError('Please record some voice input first.');
+        if (!this.currentAudioData) {
+            this.showError('No audio recording available');
             return;
         }
 
-        await this.performAnalysis({
-            type: 'voice',
-            content: transcript,
-            // audioData would be included here if we had actual audio recording
-            context: {
-                hasAudioData: false, // Would be true with actual audio
-                timeOfDay: new Date().getHours()
+        const analysisData = {
+            input: {
+                type: 'voice',
+                audioData: this.currentAudioData,
+                context: {
+                    timeOfDay: this.getTimeOfDay()
+                }
+            },
+            options: {
+                includeInsights: true,
+                includeSuggestions: true,
+                saveToHistory: true
             }
-        });
+        };
+
+        await this.performAnalysis(analysisData);
+    }
+
+    handleDragOver(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.currentTarget.classList.add('drag-over');
+    }
+
+    handleImageDrop(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.currentTarget.classList.remove('drag-over');
+
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            this.processImageFile(files[0]);
+        }
+    }
+
+    handleImageSelect(e) {
+        const file = e.target.files[0];
+        if (file) {
+            this.processImageFile(file);
+        }
+    }
+
+    processImageFile(file) {
+        if (!file.type.startsWith('image/')) {
+            this.showError('Please select a valid image file');
+            return;
+        }
+
+        if (file.size > 10 * 1024 * 1024) { // 10MB limit
+            this.showError('Image file is too large. Please select a file under 10MB.');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            this.currentImageData = e.target.result.split(',')[1]; // Remove data URL prefix
+            this.showImagePreview(e.target.result);
+            document.getElementById('analyze-image-btn').disabled = false;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    showImagePreview(imageSrc) {
+        const uploadArea = document.getElementById('image-upload-area');
+        const preview = document.getElementById('image-preview');
+        const previewImg = document.getElementById('preview-image');
+
+        if (uploadArea) uploadArea.style.display = 'none';
+        if (preview) preview.style.display = 'block';
+        if (previewImg) previewImg.src = imageSrc;
+    }
+
+    removeImage() {
+        const uploadArea = document.getElementById('image-upload-area');
+        const preview = document.getElementById('image-preview');
+        const analyzeBtn = document.getElementById('analyze-image-btn');
+        const fileInput = document.getElementById('image-file-input');
+
+        if (uploadArea) uploadArea.style.display = 'block';
+        if (preview) preview.style.display = 'none';
+        if (analyzeBtn) analyzeBtn.disabled = true;
+        if (fileInput) fileInput.value = '';
+
+        this.currentImageData = null;
+    }
+
+    async toggleCamera() {
+        // Camera functionality would be implemented here
+        this.showError('Camera functionality coming soon!');
     }
 
     async analyzeImage() {
         if (!this.currentImageData) {
-            this.showError('Please upload or capture an image first.');
+            this.showError('No image selected');
             return;
         }
 
-        await this.performAnalysis({
-            type: 'image',
-            imageData: this.currentImageData,
-            context: {
-                timeOfDay: new Date().getHours()
+        const analysisData = {
+            input: {
+                type: 'image',
+                imageData: this.currentImageData,
+                context: {
+                    timeOfDay: this.getTimeOfDay()
+                }
+            },
+            options: {
+                includeInsights: true,
+                includeSuggestions: true,
+                saveToHistory: true
             }
-        });
+        };
+
+        await this.performAnalysis(analysisData);
     }
 
     async analyzeCombined() {
         const textInput = document.getElementById('combined-text-input');
-        const text = textInput.value.trim();
-        const includeVoice = document.getElementById('combined-include-voice').checked;
-        const includeImage = document.getElementById('combined-include-image').checked;
-        const includeSpiritual = document.getElementById('combined-spiritual-context').checked;
+        const includeVoice = document.getElementById('combined-voice');
+        const includeImage = document.getElementById('combined-image');
 
-        if (!text && !includeVoice && !includeImage) {
-            this.showError('Please provide at least one input type for combined analysis.');
+        const hasText = textInput && textInput.value.trim();
+        const hasVoice = includeVoice?.checked && this.currentAudioData;
+        const hasImage = includeImage?.checked && this.currentImageData;
+
+        if (!hasText && !hasVoice && !hasImage) {
+            this.showError('Please provide at least one input (text, voice, or image)');
             return;
         }
 
-        const analysisInput = {
-            type: 'combined',
-            content: text || null,
-            context: {
-                includeSpiritual,
-                timeOfDay: new Date().getHours()
+        const analysisData = {
+            input: {
+                type: 'combined',
+                content: hasText ? textInput.value.trim() : undefined,
+                audioData: hasVoice ? this.currentAudioData : undefined,
+                imageData: hasImage ? this.currentImageData : undefined,
+                context: {
+                    timeOfDay: this.getTimeOfDay()
+                }
+            },
+            options: {
+                includeInsights: true,
+                includeSuggestions: true,
+                saveToHistory: true
             }
         };
 
-        if (includeVoice) {
-            // In a real implementation, we would include voice data here
-            analysisInput.audioData = null; // Placeholder
-        }
-
-        if (includeImage && this.currentImageData) {
-            analysisInput.imageData = this.currentImageData;
-        }
-
-        await this.performAnalysis(analysisInput);
+        await this.performAnalysis(analysisData);
     }
 
-    analyzeCurrentTab(tabName) {
-        switch (tabName) {
-            case 'text':
-                this.analyzeText();
-                break;
-            case 'voice':
-                this.analyzeVoice();
-                break;
-            case 'image':
-                this.analyzeImage();
-                break;
-            case 'combined':
-                this.analyzeCombined();
-                break;
-        }
-    }
-
-    async performAnalysis(input) {
+    async performAnalysis(analysisData) {
         if (this.isAnalyzing) return;
 
         this.isAnalyzing = true;
         this.showLoading(true);
-        this.updateStatus('analyzing', 'Analyzing your mood...');
+        this.retryAttempts = 0;
 
         try {
-            const response = await this.makeApiRequest('/api/mood/analyze', {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                throw new Error('Authentication required');
+            }
+
+            const response = await fetch('/api/mood/analyze', {
                 method: 'POST',
-                body: JSON.stringify({
-                    input,
-                    options: {
-                        includeInsights: true,
-                        includeSuggestions: true,
-                        saveToHistory: true
-                    }
-                })
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(analysisData)
             });
 
-            if (response.success) {
-                this.currentAnalysis = response.data;
-                this.displayResults(response.data);
-                this.analysisHistory.unshift(response.data);
-                
-                // Keep only last 10 analyses in memory
-                if (this.analysisHistory.length > 10) {
-                    this.analysisHistory = this.analysisHistory.slice(0, 10);
-                }
+            if (response.status === 429) {
+                throw new Error('Too many requests. Please wait a moment before analyzing again.');
+            }
+
+            if (response.status === 401) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Analysis failed');
+            }
+
+            const result = await response.json();
+            
+            if (result.success) {
+                this.currentAnalysis = result.data;
+                this.displayResults(result.data);
+                this.analysisHistory.unshift(result.data);
             } else {
-                throw new Error(response.error || 'Analysis failed');
+                throw new Error(result.error || 'Analysis failed');
             }
 
         } catch (error) {
-            console.error('Mood analysis error:', error);
-            this.handleAnalysisError(error);
+            console.error('Analysis error:', error);
+            this.handleAnalysisError(error, analysisData);
         } finally {
             this.isAnalyzing = false;
             this.showLoading(false);
-            this.updateStatus('ready', 'Ready to analyze');
         }
     }
 
-    displayResults(analysisData) {
-        const resultsContainer = document.getElementById('mood-results');
-        resultsContainer.style.display = 'block';
-
-        // Primary emotion
-        this.displayPrimaryEmotion(analysisData);
-
-        // Emotion breakdown
-        this.displayEmotionBreakdown(analysisData.emotions);
-
-        // Spiritual context
-        if (analysisData.spiritualContext && analysisData.spiritualContext.isSpiritual) {
-            this.displaySpiritualContext(analysisData.spiritualContext);
+    handleAnalysisError(error, analysisData) {
+        if (error.message.includes('rate limit') || error.message.includes('Too many requests')) {
+            this.showError('You\'ve reached the analysis limit. Please wait a moment before trying again.');
+        } else if (error.message.includes('Authentication')) {
+            this.showError('Please log in to use mood analysis.');
+        } else if (this.retryAttempts < this.maxRetryAttempts) {
+            this.retryAttempts++;
+            this.showError(`Analysis failed. Retrying... (${this.retryAttempts}/${this.maxRetryAttempts})`);
+            setTimeout(() => {
+                this.performAnalysis(analysisData);
+            }, Math.pow(2, this.retryAttempts) * 1000);
         } else {
-            document.getElementById('spiritual-context').style.display = 'none';
+            this.showError(error.message || 'Analysis failed. Please try again.');
         }
-
-        // Insights
-        this.displayInsights(analysisData.insights || []);
-
-        // Suggestions
-        this.displaySuggestions(analysisData.suggestions || []);
-
-        // Metadata
-        this.displayMetadata(analysisData);
-
-        // Scroll to results
-        resultsContainer.scrollIntoView({ behavior: 'smooth' });
     }
 
-    displayPrimaryEmotion(analysisData) {
+    displayResults(data) {
+        const resultsSection = document.getElementById('mood-results');
+        if (!resultsSection) return;
+
+        // Show results section
+        resultsSection.style.display = 'block';
+        resultsSection.scrollIntoView({ behavior: 'smooth' });
+
+        // Update primary emotion
+        this.updatePrimaryEmotion(data);
+
+        // Update emotion breakdown
+        this.updateEmotionBreakdown(data.emotions);
+
+        // Update spiritual context
+        this.updateSpiritualContext(data.spiritualContext);
+
+        // Update insights
+        this.updateInsights(data.insights);
+
+        // Update suggestions
+        this.updateSuggestions(data.suggestions);
+
+        // Update metadata
+        this.updateMetadata(data);
+    }
+
+    updatePrimaryEmotion(data) {
         const emotionIcon = document.getElementById('emotion-icon');
         const emotionName = document.getElementById('emotion-name');
         const emotionConfidence = document.getElementById('emotion-confidence');
         const emotionIntensity = document.getElementById('emotion-intensity');
         const primaryEmotion = document.getElementById('primary-emotion');
 
-        // Emotion icons mapping
         const emotionIcons = {
             peaceful: '😌',
             grateful: '🙏',
@@ -773,141 +921,124 @@ class MoodDetector {
             neutral: '😐'
         };
 
-        emotionIcon.textContent = emotionIcons[analysisData.primaryEmotion] || '😐';
-        emotionName.textContent = analysisData.primaryEmotion.charAt(0).toUpperCase() + 
-                                 analysisData.primaryEmotion.slice(1);
-        emotionConfidence.textContent = `${Math.round(analysisData.confidence * 100)}% confidence`;
-        emotionIntensity.textContent = `${analysisData.intensity.charAt(0).toUpperCase() + 
-                                       analysisData.intensity.slice(1)} intensity`;
-
-        // Add emotion-specific styling
-        primaryEmotion.className = `primary-emotion emotion-${analysisData.primaryEmotion}`;
+        if (emotionIcon) emotionIcon.textContent = emotionIcons[data.primaryEmotion] || '😐';
+        if (emotionName) emotionName.textContent = data.primaryEmotion.charAt(0).toUpperCase() + data.primaryEmotion.slice(1);
+        if (emotionConfidence) emotionConfidence.textContent = `Confidence: ${Math.round(data.confidence * 100)}%`;
+        if (emotionIntensity) emotionIntensity.textContent = `Intensity: ${data.intensity.charAt(0).toUpperCase() + data.intensity.slice(1)}`;
+        
+        if (primaryEmotion) {
+            primaryEmotion.className = `primary-emotion emotion-${data.primaryEmotion}`;
+        }
     }
 
-    displayEmotionBreakdown(emotions) {
+    updateEmotionBreakdown(emotions) {
         const emotionBars = document.getElementById('emotion-bars');
-        emotionBars.innerHTML = '';
+        if (!emotionBars || !emotions) return;
 
-        // Sort emotions by score
-        const sortedEmotions = Object.entries(emotions)
+        const maxScore = Math.max(...Object.values(emotions));
+        
+        emotionBars.innerHTML = Object.entries(emotions)
             .sort(([,a], [,b]) => b - a)
-            .slice(0, 6); // Show top 6 emotions
-
-        sortedEmotions.forEach(([emotion, score]) => {
-            const barContainer = document.createElement('div');
-            barContainer.className = 'emotion-bar-container';
-
-            const maxScore = Math.max(...Object.values(emotions));
-            const percentage = (score / maxScore) * 100;
-
-            barContainer.innerHTML = `
-                <div class="emotion-bar-label">${emotion}</div>
-                <div class="emotion-bar">
-                    <div class="emotion-bar-fill emotion-${emotion}" style="width: ${percentage}%">
-                        <span class="emotion-bar-score">${Math.round(score * 100)}%</span>
+            .map(([emotion, score]) => `
+                <div class="emotion-bar-container">
+                    <div class="emotion-bar-label">${emotion}</div>
+                    <div class="emotion-bar">
+                        <div class="emotion-bar-fill emotion-${emotion}" 
+                             style="width: ${(score / maxScore) * 100}%">
+                            <span class="emotion-bar-score">${Math.round(score * 100)}%</span>
+                        </div>
                     </div>
                 </div>
-            `;
-
-            emotionBars.appendChild(barContainer);
-        });
+            `).join('');
     }
 
-    displaySpiritualContext(spiritualContext) {
-        const spiritualContextDiv = document.getElementById('spiritual-context');
-        const spiritualScoreValue = document.getElementById('spiritual-score-value');
-        const spiritualTraditionValue = document.getElementById('spiritual-tradition-value');
+    updateSpiritualContext(spiritualContext) {
+        const spiritualSection = document.getElementById('spiritual-context');
+        const spiritualScore = document.getElementById('spiritual-score-value');
+        const spiritualTradition = document.getElementById('spiritual-tradition-value');
         const spiritualTags = document.getElementById('spiritual-tags');
 
-        spiritualContextDiv.style.display = 'block';
-
-        // Spiritual score
-        const scoreText = spiritualContext.score > 0.7 ? 'High' : 
-                         spiritualContext.score > 0.4 ? 'Medium' : 'Low';
-        spiritualScoreValue.textContent = scoreText;
-
-        // Detected tradition
-        spiritualTraditionValue.textContent = spiritualContext.suggestedTradition || 'Universal';
-
-        // Spiritual tags
-        spiritualTags.innerHTML = '';
-        const allTerms = [
-            ...spiritualContext.detectedTerms.spiritual,
-            ...spiritualContext.detectedTerms.religious,
-            ...spiritualContext.detectedTerms.practices
-        ];
-
-        allTerms.slice(0, 8).forEach(term => {
-            const tag = document.createElement('span');
-            tag.className = 'spiritual-tag';
-            tag.textContent = term;
-            spiritualTags.appendChild(tag);
-        });
-    }
-
-    displayInsights(insights) {
-        const insightsContainer = document.getElementById('insights-container');
-        insightsContainer.innerHTML = '';
-
-        if (insights.length === 0) {
-            insightsContainer.innerHTML = '<p>No specific insights available for this analysis.</p>';
+        if (!spiritualContext || !spiritualContext.isSpiritual) {
+            if (spiritualSection) spiritualSection.style.display = 'none';
             return;
         }
 
-        insights.forEach(insight => {
-            const insightDiv = document.createElement('div');
-            insightDiv.className = `insight insight-${insight.type}`;
+        if (spiritualSection) spiritualSection.style.display = 'block';
+        
+        if (spiritualScore) {
+            const scoreText = spiritualContext.score > 0.7 ? 'High' : 
+                             spiritualContext.score > 0.4 ? 'Medium' : 'Low';
+            spiritualScore.textContent = scoreText;
+        }
+        
+        if (spiritualTradition) {
+            spiritualTradition.textContent = spiritualContext.suggestedTradition || 'Universal';
+        }
+        
+        if (spiritualTags) {
+            const allTerms = [
+                ...spiritualContext.detectedTerms.spiritual,
+                ...spiritualContext.detectedTerms.religious,
+                ...spiritualContext.detectedTerms.practices
+            ];
+            
+            spiritualTags.innerHTML = allTerms
+                .slice(0, 5)
+                .map(term => `<span class="spiritual-tag">${term}</span>`)
+                .join('');
+        }
+    }
 
-            insightDiv.innerHTML = `
-                <div class="insight-icon">${insight.icon}</div>
+    updateInsights(insights) {
+        const insightsContent = document.getElementById('insights-content');
+        if (!insightsContent || !insights || insights.length === 0) {
+            if (insightsContent) insightsContent.innerHTML = '<p>No specific insights available.</p>';
+            return;
+        }
+
+        insightsContent.innerHTML = insights.map(insight => `
+            <div class="insight insight-${insight.type}">
+                <div class="insight-icon">${insight.icon || '💡'}</div>
                 <div class="insight-content">
                     <div class="insight-message">${insight.message}</div>
                 </div>
-            `;
-
-            insightsContainer.appendChild(insightDiv);
-        });
+            </div>
+        `).join('');
     }
 
-    displaySuggestions(suggestions) {
+    updateSuggestions(suggestions) {
         const suggestionsGrid = document.getElementById('suggestions-grid');
-        suggestionsGrid.innerHTML = '';
-
-        if (suggestions.length === 0) {
-            suggestionsGrid.innerHTML = '<p>No specific suggestions available for this analysis.</p>';
+        if (!suggestionsGrid || !suggestions || suggestions.length === 0) {
+            if (suggestionsGrid) suggestionsGrid.innerHTML = '<p>No suggestions available at this time.</p>';
             return;
         }
 
-        suggestions.forEach(suggestion => {
-            const suggestionCard = document.createElement('div');
-            suggestionCard.className = 'suggestion-card';
-
-            suggestionCard.innerHTML = `
-                <div class="suggestion-icon">${suggestion.icon}</div>
+        suggestionsGrid.innerHTML = suggestions.map(suggestion => `
+            <div class="suggestion-card" data-action="${suggestion.action}">
+                <div class="suggestion-icon">${suggestion.icon || '💡'}</div>
                 <div class="suggestion-title">${suggestion.title}</div>
                 <div class="suggestion-description">${suggestion.description}</div>
-                <button class="suggestion-action" data-action="${suggestion.action}">
+                <button class="suggestion-action" onclick="window.moodDetector.handleSuggestionAction('${suggestion.action}')">
                     Try This
                 </button>
-            `;
-
-            // Add click handler for suggestion actions
-            suggestionCard.querySelector('.suggestion-action').addEventListener('click', () => {
-                this.handleSuggestionAction(suggestion.action, suggestion);
-            });
-
-            suggestionsGrid.appendChild(suggestionCard);
-        });
+            </div>
+        `).join('');
     }
 
-    displayMetadata(analysisData) {
-        document.getElementById('processing-time').textContent = `${analysisData.processingTime}ms`;
-        document.getElementById('analysis-type').textContent = analysisData.analysisType;
-        document.getElementById('analysis-timestamp').textContent = 
-            new Date(analysisData.timestamp).toLocaleString();
+    updateMetadata(data) {
+        const processingTime = document.getElementById('processing-time');
+        const analysisType = document.getElementById('analysis-type');
+        const analysisTimestamp = document.getElementById('analysis-timestamp');
+
+        if (processingTime) processingTime.textContent = `${data.processingTime}ms`;
+        if (analysisType) analysisType.textContent = data.analysisType;
+        if (analysisTimestamp) {
+            const date = new Date(data.timestamp);
+            analysisTimestamp.textContent = date.toLocaleString();
+        }
     }
 
-    handleSuggestionAction(action, suggestion) {
+    handleSuggestionAction(action) {
         switch (action) {
             case 'breathing_exercise':
                 this.showBreathingExercise();
@@ -921,500 +1052,300 @@ class MoodDetector {
             case 'tasbih_counter':
                 this.openTasbihCounter();
                 break;
-            case 'spiritual_reflection':
-                this.showSpiritualReflection();
-                break;
             default:
-                alert(`Action: ${action}\n\n${suggestion.description}`);
+                this.showError('This suggestion action is not yet implemented.');
         }
     }
 
     showBreathingExercise() {
-        alert('Breathing Exercise:\n\n1. Breathe in for 4 counts\n2. Hold for 7 counts\n3. Breathe out for 8 counts\n4. Repeat 4 times\n\nThis will help calm your nervous system.');
+        alert('Breathing Exercise:\n\n1. Inhale for 4 counts\n2. Hold for 7 counts\n3. Exhale for 8 counts\n4. Repeat 4 times\n\nThis helps activate your parasympathetic nervous system and reduce anxiety.');
     }
 
     showPrayerGuidance() {
-        alert('Take a moment for prayer or meditation:\n\n• Find a quiet space\n• Focus on your breathing\n• Connect with the divine\n• Ask for peace and guidance\n• Express gratitude for your blessings');
+        alert('Take a moment for prayer or meditation:\n\n• Find a quiet space\n• Focus on your breathing\n• Connect with your spiritual center\n• Ask for guidance and peace\n• Express gratitude for your blessings');
     }
 
     showGratitudePractice() {
-        const gratitudeItems = prompt('List three things you\'re grateful for today (separate with commas):');
+        const gratitudeItems = prompt('Gratitude Practice:\n\nList 3 things you\'re grateful for today (separate with commas):');
         if (gratitudeItems) {
-            alert(`Beautiful! You\'re grateful for:\n\n${gratitudeItems.split(',').map((item, i) => `${i + 1}. ${item.trim()}`).join('\n')}\n\nGratitude opens the heart to more blessings.`);
+            alert(`Beautiful! Your gratitude list:\n\n${gratitudeItems.split(',').map((item, i) => `${i + 1}. ${item.trim()}`).join('\n')}\n\nTake a moment to feel the warmth of these blessings.`);
         }
     }
 
     openTasbihCounter() {
         // This would integrate with the existing tasbih functionality
-        alert('Opening Digital Tasbih...\n\nThis would open the tasbih counter for dhikr and remembrance.');
+        alert('Opening Digital Tasbih counter...\n\nThis would connect to your existing tasbih feature for dhikr and remembrance.');
     }
 
-    showSpiritualReflection() {
-        alert('Spiritual Reflection Guide:\n\n• What is your heart telling you right now?\n• How can you grow closer to the divine?\n• What spiritual practices bring you peace?\n• How can you serve others today?\n\nTake time to contemplate these questions.');
-    }
+    showLoading(show) {
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const statusIndicator = document.getElementById('mood-status-indicator');
+        const statusText = document.getElementById('mood-status-text');
 
-    startVoiceRecording() {
-        if (!this.voiceRecognition) {
-            this.showError('Voice recognition is not supported in this browser.');
-            return;
+        if (loadingOverlay) {
+            loadingOverlay.style.display = show ? 'flex' : 'none';
         }
 
-        try {
-            this.voiceRecognition.start();
-            
-            document.getElementById('start-voice-recording').disabled = true;
-            document.getElementById('stop-voice-recording').disabled = false;
-            document.getElementById('recording-indicator').classList.add('active');
-            document.getElementById('recording-text').textContent = 'Recording... Speak now';
-            
-        } catch (error) {
-            console.error('Voice recording error:', error);
-            this.showError('Failed to start voice recording: ' + error.message);
-        }
-    }
-
-    stopVoiceRecording() {
-        if (this.voiceRecognition) {
-            this.voiceRecognition.stop();
-        }
-        this.resetVoiceRecording();
-    }
-
-    resetVoiceRecording() {
-        document.getElementById('start-voice-recording').disabled = false;
-        document.getElementById('stop-voice-recording').disabled = true;
-        document.getElementById('recording-indicator').classList.remove('active');
-        document.getElementById('recording-text').textContent = 'Click "Start Recording" to begin';
-    }
-
-    handleImageFile(file) {
-        if (!file.type.startsWith('image/')) {
-            this.showError('Please select a valid image file.');
-            return;
+        if (statusIndicator) {
+            statusIndicator.className = show ? 'status-indicator analyzing' : 'status-indicator';
         }
 
-        if (file.size > 10 * 1024 * 1024) { // 10MB limit
-            this.showError('Image file is too large. Please select a file under 10MB.');
-            return;
+        if (statusText) {
+            statusText.textContent = show ? 'Analyzing...' : 'Ready to analyze';
         }
 
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            this.currentImageData = e.target.result;
-            this.showImagePreview(e.target.result);
-            document.getElementById('analyze-image-btn').disabled = false;
-        };
-        reader.readAsDataURL(file);
+        // Disable all analyze buttons while loading
+        document.querySelectorAll('.analyze-btn').forEach(btn => {
+            btn.disabled = show;
+        });
     }
 
-    showImagePreview(imageSrc) {
-        const imagePreview = document.getElementById('image-preview');
-        const previewImage = document.getElementById('preview-image');
-        
-        previewImage.src = imageSrc;
-        imagePreview.style.display = 'block';
-    }
+    showError(message) {
+        const errorNotification = document.getElementById('error-notification');
+        const errorMessage = document.getElementById('error-message');
 
-    removeImage() {
-        this.currentImageData = null;
-        document.getElementById('image-preview').style.display = 'none';
-        document.getElementById('analyze-image-btn').disabled = true;
-        document.getElementById('image-file-input').value = '';
-    }
+        if (errorNotification && errorMessage) {
+            errorMessage.textContent = message;
+            errorNotification.style.display = 'block';
 
-    async startCamera() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            const video = document.getElementById('camera-preview');
-            
-            video.srcObject = stream;
-            video.style.display = 'block';
-            document.getElementById('capture-photo-btn').style.display = 'inline-block';
-            document.getElementById('start-camera-btn').style.display = 'none';
-            
-        } catch (error) {
-            console.error('Camera access error:', error);
-            this.showError('Failed to access camera: ' + error.message);
-        }
-    }
-
-    capturePhoto() {
-        const video = document.getElementById('camera-preview');
-        const canvas = document.createElement('canvas');
-        
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        this.currentImageData = canvas.toDataURL('image/png');
-        this.showImagePreview(this.currentImageData);
-        
-        // Stop camera
-        const stream = video.srcObject;
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-        }
-        
-        video.style.display = 'none';
-        document.getElementById('capture-photo-btn').style.display = 'none';
-        document.getElementById('start-camera-btn').style.display = 'inline-block';
-        document.getElementById('analyze-image-btn').disabled = false;
-    }
-
-    async saveAnalysis() {
-        if (!this.currentAnalysis) return;
-
-        try {
-            // Analysis is already saved to history by default
-            // This could trigger additional save actions like bookmarking
-            this.showSuccess('Analysis saved to your mood history!');
-            
-        } catch (error) {
-            console.error('Save analysis error:', error);
-            this.showError('Failed to save analysis.');
-        }
-    }
-
-    async shareAnalysis() {
-        if (!this.currentAnalysis) return;
-
-        const shareText = `My mood analysis: ${this.currentAnalysis.primaryEmotion} (${Math.round(this.currentAnalysis.confidence * 100)}% confidence) - Mirror of Heart App`;
-        
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: 'My Mood Analysis',
-                    text: shareText
-                });
-            } catch (error) {
-                console.error('Share error:', error);
-            }
+            setTimeout(() => {
+                errorNotification.style.display = 'none';
+            }, 5000);
         } else {
-            // Fallback to clipboard
-            try {
-                await navigator.clipboard.writeText(shareText);
-                this.showSuccess('Analysis copied to clipboard!');
-            } catch (error) {
-                console.error('Clipboard error:', error);
-                this.showError('Failed to copy to clipboard.');
-            }
+            // Fallback to alert
+            alert(`Error: ${message}`);
         }
     }
 
-    clearResults() {
-        document.getElementById('mood-results').style.display = 'none';
-        this.currentAnalysis = null;
-    }
-
-    async toggleHistoryPanel(show = null) {
+    toggleHistoryPanel(show = null) {
         const panel = document.getElementById('mood-history-panel');
+        if (!panel) return;
+
         const isVisible = panel.classList.contains('visible');
         
         if (show === null) {
             show = !isVisible;
         }
-        
+
         if (show) {
             panel.classList.add('visible');
-            await this.loadHistory();
+            this.loadHistory();
         } else {
             panel.classList.remove('visible');
         }
     }
 
-    async toggleAnalyticsPanel(show = null) {
+    toggleAnalyticsPanel(show = null) {
         const panel = document.getElementById('mood-analytics-panel');
+        if (!panel) return;
+
         const isVisible = panel.classList.contains('visible');
         
         if (show === null) {
             show = !isVisible;
         }
-        
+
         if (show) {
             panel.classList.add('visible');
-            await this.loadAnalyticsData();
+            this.loadAnalyticsData();
         } else {
             panel.classList.remove('visible');
         }
     }
 
     async loadHistory() {
+        const historyContent = document.getElementById('history-content');
+        const timeframe = document.getElementById('history-timeframe')?.value || '30d';
+        const emotionFilter = document.getElementById('history-emotion-filter')?.value || '';
+
+        if (!historyContent) return;
+
         try {
-            const timeframe = document.getElementById('history-timeframe').value;
-            const emotionFilter = document.getElementById('history-emotion-filter').value;
-            
-            const params = new URLSearchParams({
-                timeframe,
-                limit: '20',
-                includeInsights: 'true'
-            });
-            
+            const token = localStorage.getItem('token');
+            let url = `/api/mood/history?timeframe=${timeframe}&limit=20`;
             if (emotionFilter) {
-                params.append('emotions', emotionFilter);
+                url += `&emotions=${emotionFilter}`;
             }
 
-            const response = await this.makeApiRequest(`/api/mood/history?${params}`);
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!response.ok) throw new Error('Failed to load history');
+
+            const result = await response.json();
             
-            if (response.success) {
-                this.displayHistory(response.data.entries);
+            if (result.success && result.data.entries.length > 0) {
+                historyContent.innerHTML = result.data.entries.map(entry => `
+                    <div class="history-entry">
+                        <div class="history-header">
+                            <span class="history-emotion emotion-${entry.primaryEmotion}">${entry.primaryEmotion}</span>
+                            <span class="history-date">${new Date(entry.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <div class="history-details">
+                            <span>Confidence: ${Math.round(entry.confidence * 100)}%</span>
+                            <span>Intensity: ${entry.intensity}</span>
+                            <span>Type: ${entry.analysisType}</span>
+                        </div>
+                        ${entry.insights && entry.insights.length > 0 ? `
+                            <div class="history-insights">
+                                ${entry.insights.slice(0, 2).map(insight => `
+                                    <div class="history-insight">${insight.message}</div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `).join('');
             } else {
-                throw new Error(response.error);
+                historyContent.innerHTML = `
+                    <div class="empty-history">
+                        <div class="empty-icon">📊</div>
+                        <p>No mood entries found</p>
+                        <p>Start analyzing your mood to see history here</p>
+                    </div>
+                `;
             }
 
         } catch (error) {
             console.error('Load history error:', error);
-            this.showError('Failed to load mood history.');
+            historyContent.innerHTML = '<p>Failed to load history. Please try again.</p>';
         }
-    }
-
-    displayHistory(entries) {
-        const historyContent = document.getElementById('history-content');
-        
-        if (entries.length === 0) {
-            historyContent.innerHTML = `
-                <div class="empty-history">
-                    <div class="empty-icon">📊</div>
-                    <p>No mood entries found</p>
-                    <p>Start analyzing your mood to see your history here</p>
-                </div>
-            `;
-            return;
-        }
-
-        historyContent.innerHTML = entries.map(entry => `
-            <div class="history-entry">
-                <div class="history-header">
-                    <span class="history-emotion emotion-${entry.primaryEmotion}">
-                        ${entry.primaryEmotion}
-                    </span>
-                    <span class="history-date">
-                        ${new Date(entry.createdAt).toLocaleDateString()}
-                    </span>
-                </div>
-                <div class="history-details">
-                    <span>Confidence: ${Math.round(entry.confidence * 100)}%</span>
-                    <span>Intensity: ${entry.intensity}</span>
-                    <span>Type: ${entry.analysisType}</span>
-                </div>
-                ${entry.insights && entry.insights.length > 0 ? `
-                    <div class="history-insights">
-                        ${entry.insights.slice(0, 2).map(insight => `
-                            <div class="history-insight">
-                                ${insight.icon} ${insight.message}
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
-            </div>
-        `).join('');
     }
 
     async loadAnalyticsData() {
+        const analyticsContent = document.getElementById('analytics-content');
+        if (!analyticsContent) return;
+
         try {
-            const response = await this.makeApiRequest('/api/mood/analytics?timeframe=30d');
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/mood/analytics?timeframe=30d', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!response.ok) throw new Error('Failed to load analytics');
+
+            const result = await response.json();
             
-            if (response.success) {
-                this.displayAnalytics(response.data);
-            } else {
-                throw new Error(response.error);
+            if (result.success) {
+                const data = result.data;
+                analyticsContent.innerHTML = `
+                    <div class="analytics-overview">
+                        <div class="analytics-card">
+                            <div class="analytics-number">${data.totalEntries}</div>
+                            <div class="analytics-label">Total Analyses</div>
+                        </div>
+                        <div class="analytics-card">
+                            <div class="analytics-number">${data.dominantEmotion || 'N/A'}</div>
+                            <div class="analytics-label">Dominant Emotion</div>
+                        </div>
+                        <div class="analytics-card">
+                            <div class="analytics-number">${Math.round(data.averageConfidence * 100)}%</div>
+                            <div class="analytics-label">Avg Confidence</div>
+                        </div>
+                        <div class="analytics-card">
+                            <div class="analytics-number">${Math.round(data.moodStability * 100)}%</div>
+                            <div class="analytics-label">Mood Stability</div>
+                        </div>
+                    </div>
+
+                    <div class="emotion-chart">
+                        <h4>Emotion Distribution</h4>
+                        <div class="distribution-chart">
+                            ${Object.entries(data.emotionDistribution || {}).map(([emotion, count]) => {
+                                const percentage = (count / data.totalEntries) * 100;
+                                return `
+                                    <div class="distribution-bar">
+                                        <div class="distribution-label">${emotion}</div>
+                                        <div class="distribution-fill emotion-${emotion}" style="width: ${percentage}%">
+                                            <span class="distribution-count">${count}</span>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+
+                    <div class="intensity-chart">
+                        <h4>Intensity Distribution</h4>
+                        <div class="intensity-chart">
+                            ${Object.entries(data.intensityDistribution || {}).map(([intensity, count]) => `
+                                <div class="intensity-item">
+                                    <div class="intensity-value">${count}</div>
+                                    <div class="intensity-label">${intensity}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    ${data.insights && data.insights.length > 0 ? `
+                        <div class="insights">
+                            <h4>Key Insights</h4>
+                            <ul>
+                                ${data.insights.map(insight => `<li>${insight.message}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                `;
             }
 
         } catch (error) {
             console.error('Load analytics error:', error);
-            this.showError('Failed to load mood analytics.');
+            analyticsContent.innerHTML = '<p>Failed to load analytics. Please try again.</p>';
         }
     }
 
-    displayAnalytics(analyticsData) {
-        const analyticsContent = document.getElementById('analytics-content');
-        
-        analyticsContent.innerHTML = `
-            <div class="analytics-overview">
-                <div class="analytics-card">
-                    <div class="analytics-number">${analyticsData.totalEntries}</div>
-                    <div class="analytics-label">Total Analyses</div>
-                </div>
-                <div class="analytics-card">
-                    <div class="analytics-number emotion-${analyticsData.dominantEmotion?.toLowerCase() || 'neutral'}">
-                        ${analyticsData.dominantEmotion || 'None'}
-                    </div>
-                    <div class="analytics-label">Dominant Emotion</div>
-                </div>
-                <div class="analytics-card">
-                    <div class="analytics-number">${Math.round(analyticsData.averageConfidence * 100)}%</div>
-                    <div class="analytics-label">Avg Confidence</div>
-                </div>
-                <div class="analytics-card">
-                    <div class="analytics-number">${Math.round(analyticsData.moodStability * 100)}%</div>
-                    <div class="analytics-label">Mood Stability</div>
-                </div>
-            </div>
-            
-            <div class="emotion-chart">
-                <h4>Emotion Distribution (${analyticsData.timeframe})</h4>
-                <div class="distribution-chart">
-                    ${Object.entries(analyticsData.emotionDistribution || {}).map(([emotion, count]) => {
-                        const maxCount = Math.max(...Object.values(analyticsData.emotionDistribution));
-                        const percentage = (count / maxCount) * 100;
-                        return `
-                            <div class="distribution-bar">
-                                <div class="distribution-label">${emotion}</div>
-                                <div class="distribution-fill emotion-${emotion}" style="width: ${percentage}%">
-                                    <span class="distribution-count">${count}</span>
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>
-            
-            <div class="intensity-chart">
-                <h4>Intensity Distribution</h4>
-                <div class="intensity-chart">
-                    ${Object.entries(analyticsData.intensityDistribution || {}).map(([intensity, count]) => `
-                        <div class="intensity-item">
-                            <div class="intensity-label">${intensity}</div>
-                            <div class="intensity-value">${count}</div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-            
-            ${analyticsData.insights && analyticsData.insights.length > 0 ? `
-                <div class="insights">
-                    <h4>Key Insights</h4>
-                    <ul>
-                        ${analyticsData.insights.map(insight => `
-                            <li>${insight.message}</li>
-                        `).join('')}
-                    </ul>
-                </div>
-            ` : ''}
-        `;
-    }
-
-    async makeApiRequest(url, options = {}) {
-        const token = localStorage.getItem('token');
-        
-        const defaultOptions = {
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            }
-        };
-
-        const response = await fetch(url, { ...defaultOptions, ...options });
-        
-        if (response.status === 429) {
-            throw new Error('Too many requests. Please wait a moment before analyzing again.');
-        }
-        
-        if (response.status === 401) {
-            window.location.href = '/login.html';
+    saveResult() {
+        if (!this.currentAnalysis) {
+            this.showError('No analysis result to save');
             return;
         }
-        
-        return await response.json();
+
+        // Analysis is already saved to history by default
+        // This could trigger additional save actions like bookmarking
+        alert('Analysis result saved to your mood history!');
     }
 
-    handleAnalysisError(error) {
-        this.retryAttempts++;
+    shareResult() {
+        if (!this.currentAnalysis) {
+            this.showError('No analysis result to share');
+            return;
+        }
+
+        const shareText = `My mood analysis: ${this.currentAnalysis.primaryEmotion} (${Math.round(this.currentAnalysis.confidence * 100)}% confidence) - Mirror of Heart`;
         
-        if (error.message.includes('Too many requests')) {
-            this.showError('Rate limit reached. Please wait a moment before analyzing again.');
-        } else if (error.message.includes('timeout')) {
-            this.showError('Analysis timed out. Please try again.');
-        } else if (this.retryAttempts < this.maxRetryAttempts) {
-            this.showError(`Analysis failed. Retrying... (${this.retryAttempts}/${this.maxRetryAttempts})`);
-            setTimeout(() => {
-                // Retry the last analysis
-                const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
-                this.analyzeCurrentTab(activeTab);
-            }, 2000);
+        if (navigator.share) {
+            navigator.share({
+                title: 'My Mood Analysis',
+                text: shareText,
+                url: window.location.href
+            });
         } else {
-            this.showError('Analysis failed after multiple attempts. Please try again later.');
-            this.retryAttempts = 0;
+            // Fallback to clipboard
+            navigator.clipboard.writeText(shareText).then(() => {
+                alert('Analysis result copied to clipboard!');
+            }).catch(() => {
+                alert('Share text:\n\n' + shareText);
+            });
         }
     }
 
-    updateCharacterCount(input, countElement) {
-        const count = input.value.length;
-        const max = input.maxLength;
-        
-        countElement.textContent = count;
-        
-        if (count > max * 0.9) {
-            countElement.style.color = '#ef4444';
-        } else if (count > max * 0.7) {
-            countElement.style.color = '#f59e0b';
-        } else {
-            countElement.style.color = '#6b7280';
-        }
-    }
-
-    updateStatus(status, text) {
-        const indicator = document.getElementById('mood-status-indicator');
-        const statusText = document.getElementById('mood-status-text');
-        
-        indicator.className = `status-indicator ${status}`;
-        statusText.textContent = text;
-    }
-
-    showLoading(show) {
-        const overlay = document.getElementById('mood-loading-overlay');
-        overlay.style.display = show ? 'flex' : 'none';
-    }
-
-    showError(message) {
-        // Create or update error notification
-        let errorNotification = document.getElementById('mood-error-notification');
-        if (!errorNotification) {
-            errorNotification = document.createElement('div');
-            errorNotification.id = 'mood-error-notification';
-            errorNotification.className = 'error-notification';
-            document.body.appendChild(errorNotification);
-        }
-        
-        errorNotification.textContent = message;
-        errorNotification.style.display = 'block';
-        
-        setTimeout(() => {
-            errorNotification.style.display = 'none';
-        }, 5000);
-    }
-
-    showSuccess(message) {
-        // Create or update success notification
-        let successNotification = document.getElementById('mood-success-notification');
-        if (!successNotification) {
-            successNotification = document.createElement('div');
-            successNotification.id = 'mood-success-notification';
-            successNotification.className = 'error-notification';
-            successNotification.style.background = '#10b981';
-            document.body.appendChild(successNotification);
-        }
-        
-        successNotification.textContent = message;
-        successNotification.style.display = 'block';
-        
-        setTimeout(() => {
-            successNotification.style.display = 'none';
-        }, 3000);
+    getTimeOfDay() {
+        const hour = new Date().getHours();
+        if (hour < 6) return 'early_morning';
+        if (hour < 12) return 'morning';
+        if (hour < 18) return 'afternoon';
+        if (hour < 22) return 'evening';
+        return 'night';
     }
 
     // Cleanup method
     destroy() {
         this.analysisHistory = [];
         this.currentAnalysis = null;
+        this.currentAudioData = null;
         this.currentImageData = null;
         
-        if (this.voiceRecognition) {
-            this.voiceRecognition.abort();
-        }
-        
-        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+        if (this.mediaRecorder) {
             this.mediaRecorder.stop();
         }
     }
